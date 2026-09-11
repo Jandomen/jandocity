@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Jandocity</string>
+    <string name="title_activity_main">Jandocity</string>
+    <string name="package_name">com.jandocity.app</string>
+    <string name="custom_url_scheme">com.jandocity.app</string>
+</resources>

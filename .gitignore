@@ -1,0 +1,99 @@
+# JANDOCITY — .gitignore completo
+
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+bun.lockb
+
+# Build / Dist
+dist/
+dist-ssr/
+build/
+.output/
+.turbo/
+
+# Vite
+.vite/
+*.local
+
+# Env
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+
+# Logs
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.log
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*~
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# Capacitor / Android
+android/app/build/
+android/.gradle/
+android/gradle/
+android/local.properties
+android/*.iml
+android/.idea/
+android/capacitor.build/
+android/app/release/
+android/app/debug/
+*.apk
+*.aab
+*.keystore
+*.jks
+!public/*.apk
+
+# iOS (futuro)
+ios/App/build/
+ios/App/public/
+ios/.build/
+
+# PWA / Workbox
+dev-dist/
+
+# Testing / Coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# Misc
+.cache/
+.parcel-cache/
+.turbo/
+.temp/
+tmp/
