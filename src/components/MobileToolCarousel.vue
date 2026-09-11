@@ -1,11 +1,15 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useCityStore } from '@/stores/cityStore.js'
+import { useSinglePlayerStore } from '@/stores/singlePlayerStore.js'
+import { useUnitQueue } from '@/composables/useUnitQueue.js'
 import { BUILDINGS } from '@/constants/buildings.js'
 
 defineProps({ showUI: { type: Boolean, default: true } })
 
 const city = useCityStore()
+const single = useSinglePlayerStore()
+const unitQueue = useUnitQueue()
 const selected = ref(null)
 
 const roadVariants = [
@@ -45,7 +49,7 @@ const wallVariants = [
   { id: 'end-n', label: 'Fin', icon: '╹' },
 ]
 
-const categories = [
+const baseCategories = [
   { id: 'zonas', label: 'Zonas', icon: '🏘️' },
   { id: 'altura', label: 'Altura', icon: '🏙️' },
   { id: 'grandes', label: 'Grandes', icon: '🏟️' },
@@ -64,6 +68,13 @@ const categories = [
   { id: 'naturaleza', label: 'Naturaleza', icon: '🌳' },
   { id: 'utils', label: 'Utils', icon: '🧰' },
 ]
+const categories = computed(() => {
+  if (single.isActive) return [{ id: 'produccion', label: 'Prod.', icon: '⚔️' }, ...baseCategories]
+  return baseCategories
+})
+const hasPolice = computed(() => city.flatGrid.some(c=>c.isOrigin && c.buildingId==='police_station' && c.owner===single.humanPlayer()?.id))
+const hasMil = computed(() => city.flatGrid.some(c=>c.isOrigin && c.buildingId==='military_academy' && c.owner===single.humanPlayer()?.id))
+const hasArs = computed(() => city.flatGrid.some(c=>c.isOrigin && c.buildingId==='arsenal' && c.owner===single.humanPlayer()?.id))
 
 function open(cat) { selected.value = selected.value === cat ? null : cat }
 function close() { selected.value = null }
@@ -103,10 +114,44 @@ function pick(toolId) {
               <span>{{ categories.find(x=>x.id===selected)?.icon }}</span>
               {{ categories.find(x=>x.id===selected)?.label }}
             </span>
-            <span class="text-[10px] text-white/50">toca un ítem para equipar</span>
+            <span class="text-[10px] text-white/50">{{ selected==='produccion' ? 'encola unidad' : 'toca un ítem para equipar' }}</span>
           </div>
 
           <div class="flex-1 overflow-auto p-3 space-y-3">
+            <!-- PRODUCCIÓN UN JUGADOR -->
+            <template v-if="selected==='produccion'">
+              <div v-if="!hasPolice && !hasMil && !hasArs" class="text-[11px] text-white/40 text-center py-3">Construye Comisaría, Colegio Militar o Arsenal para desbloquear</div>
+              <template v-if="hasPolice">
+              <div class="text-[10px] font-bold text-sky-400">Comisaría → Policías</div>
+              <div class="grid grid-cols-2 gap-1.5">
+                <button @click="unitQueue.enqueue('police_station','police', single.humanPlayer()?.id||'p0')" class="p-2 rounded border flex flex-col items-center gap-0.5 bg-slate-800 border-slate-700 text-white/70"><span class="text-base">👮</span><span class="text-[10px] font-semibold">Policía</span><span class="text-[9px] font-mono">$30 · 2.8s</span></button>
+                <button @click="unitQueue.enqueue('police_station','police_car', single.humanPlayer()?.id||'p0')" class="p-2 rounded border flex flex-col items-center gap-0.5 bg-slate-800 border-slate-700 text-white/70"><span class="text-base">🚔</span><span class="text-[10px] font-semibold">Patrulla</span><span class="text-[9px] font-mono">$80 · 4s</span></button>
+              </div>
+              </template>
+              <template v-if="hasMil">
+              <div class="text-[10px] font-bold text-green-400">Colegio Militar → Soldados</div>
+              <div class="grid grid-cols-2 gap-1.5">
+                <button @click="unitQueue.enqueue('military_academy','soldier', single.humanPlayer()?.id||'p0')" class="p-2 rounded border flex flex-col items-center gap-0.5 bg-slate-800 border-slate-700 text-white/70"><span class="text-base">🪖</span><span class="text-[10px] font-semibold">Soldado</span><span class="text-[9px] font-mono">$40</span></button>
+                <button @click="unitQueue.enqueue('military_academy','soldier_heavy', single.humanPlayer()?.id||'p0')" class="p-2 rounded border flex flex-col items-center gap-0.5 bg-slate-800 border-slate-700 text-white/70"><span class="text-base">🎖️</span><span class="text-[10px] font-semibold">Pesado</span><span class="text-[9px] font-mono">$60</span></button>
+                <button @click="unitQueue.enqueue('military_academy','army_jeep', single.humanPlayer()?.id||'p0')" class="p-2 rounded border flex flex-col items-center gap-0.5 bg-slate-800 border-slate-700 text-white/70"><span class="text-base">🚙</span><span class="text-[10px] font-semibold">Jeep</span><span class="text-[9px] font-mono">$90</span></button>
+                <button @click="unitQueue.enqueue('military_academy','tank', single.humanPlayer()?.id||'p0')" class="p-2 rounded border flex flex-col items-center gap-0.5 bg-slate-800 border-slate-700 text-white/70"><span class="text-base">🛡️</span><span class="text-[10px] font-semibold">Tanque</span><span class="text-[9px] font-mono">$180</span></button>
+              </div>
+              </template>
+              <template v-if="hasArs">
+              <div class="text-[10px] font-bold text-zinc-400">Arsenal → Maquinaria/Cañones</div>
+              <div class="grid grid-cols-2 gap-1.5">
+                <button @click="unitQueue.enqueue('arsenal','tractor', single.humanPlayer()?.id||'p0')" class="p-2 rounded border flex flex-col items-center gap-0.5 bg-slate-800 border-slate-700 text-white/70"><span class="text-base">🚜</span><span class="text-[10px] font-semibold">Tractor</span><span class="text-[9px] font-mono">$50</span></button>
+                <button @click="unitQueue.enqueue('arsenal','cannon', single.humanPlayer()?.id||'p0')" class="p-2 rounded border flex flex-col items-center gap-0.5 bg-slate-800 border-slate-700 text-white/70"><span class="text-base">💣</span><span class="text-[10px] font-semibold">Cañón</span><span class="text-[9px] font-mono">$120</span></button>
+              </div>
+              </template>
+              <div v-if="unitQueue.queue.length" class="bg-slate-900 rounded border border-white/10 p-2 space-y-1">
+                <div class="text-[10px] font-bold text-white/60">Cola ({{ unitQueue.queue.length }})</div>
+                <div v-for="q in unitQueue.queue" :key="q.id" class="flex items-center gap-2 text-[11px] bg-slate-800 rounded px-2 py-1 border border-slate-700">
+                  <span class="flex-1 truncate">{{ q.unitType }}</span><span class="font-mono text-sky-300">{{ Math.round(q.progress) }}%</span><div class="w-16 h-1.5 bg-black/40 rounded-full overflow-hidden"><div class="h-full bg-amber-400" :style="{width: q.progress+'%'}"></div></div>
+                </div>
+              </div>
+            </template>
+
             <!-- ZONAS -->
             <template v-if="selected==='zonas'">
               <div class="grid grid-cols-2 gap-1.5">
@@ -293,6 +338,7 @@ function pick(toolId) {
             <template v-else-if="selected==='infra'">
               <div class="grid grid-cols-2 gap-1.5">
                 <button v-for="tool in [
+                  { id: 'arsenal', label: 'Arsenal', icon: '💣', cost: BUILDINGS.arsenal.cost, sub: '3×3 · 🚜→💣' },
                   { id: 'power', label: 'Planta energía', icon: '⚡', cost: BUILDINGS.power.cost, sub: '+25⚡ 2×2' },
                   { id: 'waterPlant', label: 'Planta agua', icon: '🏭', cost: BUILDINGS.waterPlant.cost, sub: '+25💧 2×2' },
                   { id: 'factory', label: 'Fábrica', icon: '🏭', cost: BUILDINGS.factory.cost, sub: '+22💰 3×2' },

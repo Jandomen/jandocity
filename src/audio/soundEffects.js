@@ -109,6 +109,24 @@ export function createSoundEffects() {
 
     playError(reason) {
       blip(180, 0.10, 0.22, 'square'); setTimeout(()=>blip(110, 0.14, 0.20, 'square'), 80)
+    },
+
+    playGunShot() {
+      // disparo corto con panning sutil
+      blip(180, 0.06, 0.34, 'square', -90); setTimeout(()=>blip(90, 0.08, 0.28, 'square'), 35); setTimeout(()=>blip(60, 0.10, 0.18, 'triangle'), 90)
+      // eco
+      setTimeout(()=>blip(220, 0.07, 0.16, 'square'), 110)
+    },
+    playKnife() {
+      blip(300, 0.05, 0.24, 'sawtooth'); setTimeout(()=>blip(480, 0.04, 0.18, 'sawtooth'), 40)
+    },
+    playSiren(type = 'police') {
+      // police: 650→850 wail, ambulance: 720→900 yelp
+      if (type === 'ambulance') {
+        blip(720, 0.18, 0.26, 'square', 180); setTimeout(()=>blip(900, 0.18, 0.24, 'square', -120), 180)
+      } else {
+        blip(650, 0.22, 0.28, 'square', 200); setTimeout(()=>blip(850, 0.22, 0.26, 'square', -180), 220)
+      }
     }
   }
 }

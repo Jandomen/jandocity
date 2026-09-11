@@ -1,9 +1,22 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useCityStore } from '@/stores/cityStore.js'
+import { useSinglePlayerStore } from '@/stores/singlePlayerStore.js'
+import { useUnitQueue } from '@/composables/useUnitQueue.js'
 import { BUILDINGS } from '@/constants/buildings.js'
 
 const city = useCityStore()
+const single = useSinglePlayerStore()
+const unitQueue = useUnitQueue()
+
+const hasPolice = computed(() => city.flatGrid.some(c=>c.isOrigin && c.buildingId==='police_station' && c.owner===single.humanPlayer()?.id))
+const hasMil = computed(() => city.flatGrid.some(c=>c.isOrigin && c.buildingId==='military_academy' && c.owner===single.humanPlayer()?.id))
+const hasArs = computed(() => city.flatGrid.some(c=>c.isOrigin && c.buildingId==='arsenal' && c.owner===single.humanPlayer()?.id))
+const hasResidential = computed(() => city.flatGrid.some(c=>c.isOrigin && ['residential','residential_small','residential_medium','residential_large'].includes(c.buildingId) && c.owner===single.humanPlayer()?.id))
+const hasCityHall = computed(() => city.flatGrid.some(c=>c.isOrigin && c.buildingId==='city_hall' && c.owner===single.humanPlayer()?.id))
+const hasMuseum = computed(() => city.flatGrid.some(c=>c.isOrigin && c.buildingId==='museum' && c.owner===single.humanPlayer()?.id))
+const hasPower = computed(() => city.flatGrid.some(c=>c.isOrigin && c.buildingId==='power' && c.owner===single.humanPlayer()?.id))
+const hasRoadBuilt = computed(() => city.flatGrid.some(c=> (c.hasRoad || ['road','dirt_road','concrete_road','cobble_road'].includes(c.buildingId)) && c.owner===single.humanPlayer()?.id))
 
 // estado colapsable por categoría (como carreteras, todas organizadas igual)
 const open = ref({
@@ -13,6 +26,7 @@ const open = ref({
   mega: true,
   servicios: true,
   publica: true,
+  produccion: true,
   cultura: true,
   mundial: true,
   banderas: true,
@@ -92,7 +106,7 @@ function btnBase(selected, color) {
           :key="v.id"
           @click="city.selectedTool = v.id; city.selectedHouseVariant = v.id"
           class="p-2 rounded border text-xs text-left flex flex-col gap-0.5"
-          :class="city.selectedTool===v.id && city.selectedHouseVariant===v.id ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 ring-1 ring-emerald-500' : 'bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700'"
+          :class="city.selectedTool===v.id && city.selectedHouseVariant===v.id ? (single.isActive ? 'bg-slate-600 border-white text-white ring-1 ring-white' : 'bg-emerald-500/20 border-emerald-500 text-emerald-300 ring-1 ring-emerald-500') : 'bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700'"
         >
           <div class="flex items-center gap-1.5"><span class="text-sm">{{ v.icon }}</span><span class="font-semibold text-[11px]">{{ v.label }}</span><span class="ml-auto text-[10px] font-mono text-emerald-400">${{ v.cost }}</span></div>
           <div class="text-[9px] opacity-60">{{ v.sub }}</div>
@@ -111,7 +125,7 @@ function btnBase(selected, color) {
           :key="tool.id"
           @click="city.selectedTool = tool.id"
           class="p-2 rounded border text-xs text-left flex flex-col gap-0.5"
-          :class="city.selectedTool===tool.id ? 'bg-blue-500/20 border-blue-500 text-blue-300 ring-1 ring-blue-500' : 'bg-slate-800 border-slate-700 text-white/70'"
+          :class="city.selectedTool===tool.id ? (single.isActive ? 'bg-slate-600 border-white text-white ring-1 ring-white' : 'bg-blue-500/20 border-blue-500 text-blue-300 ring-1 ring-blue-500') : 'bg-slate-800 border-slate-700 text-white/70'"
         >
           <div class="flex items-center gap-1.5"><span class="text-sm">{{ tool.icon }}</span><span class="font-semibold text-[11px]">{{ tool.label }}</span><span class="ml-auto text-[10px] font-mono text-sky-400">${{ tool.cost }}</span></div>
           <div class="text-[9px] opacity-60">{{ tool.sub }}</div>
@@ -119,13 +133,14 @@ function btnBase(selected, color) {
       </div>
     </section>
 
-    <!-- 1b. ALTURA — 2 cuadros de altura -->
+    <!-- 1b. ALTURA — 2 cuadros de altura (bloqueado hasta 1 casa en Un Jugador) -->
     <section class="bg-slate-900/60 rounded-lg border border-slate-700/50 overflow-hidden">
       <button @click="toggle('altura')" class="w-full flex items-center justify-between px-3 py-2 bg-slate-800 hover:bg-slate-700 transition-colors">
         <span class="flex items-center gap-2 text-xs font-bold tracking-wider text-slate-200"><span>🏙️</span> ALTURA — 2 cuadros <span class="text-slate-400 font-normal">vertical</span></span>
         <span class="text-slate-200 text-xs">{{ open.altura ? '−' : '+' }}</span>
       </button>
-      <div v-show="open.altura" class="p-2 grid grid-cols-2 gap-1.5">
+      <div v-if="single.isActive && !hasResidential" v-show="open.altura" class="p-3 text-center text-[11px] text-white/40">🏠 Construye 1 casa para desbloquear altura</div>
+      <div v-else v-show="open.altura" class="p-2 grid grid-cols-2 gap-1.5">
         <button
           v-for="tool in [
             { id: 'tower_residential', label: 'Torre vivienda', icon: '🏢', cost: BUILDINGS.tower_residential.cost, sub: '1×2 · +26 hab' },
@@ -144,13 +159,14 @@ function btnBase(selected, color) {
       <p v-show="open.altura" class="px-2 pb-2 text-[9px] text-slate-400 leading-tight">Ocupan 2 cuadros de alto — se anclan al origen y bloquean 2 celdas.</p>
     </section>
 
-    <!-- 2. GRANDES / OCIO -->
+    <!-- 2. GRANDES / OCIO (bloqueado hasta Ayuntamiento en Un Jugador) -->
     <section class="bg-slate-900/60 rounded-lg border border-slate-700/50 overflow-hidden">
       <button @click="toggle('grandes')" class="w-full flex items-center justify-between px-3 py-2 bg-violet-900/20 hover:bg-violet-900/30 transition-colors">
         <span class="flex items-center gap-2 text-xs font-bold tracking-wider text-violet-300"><span>🏟️</span> GRANDES — Ocio <span class="text-violet-500/60 font-normal">2 edificios</span></span>
         <span class="text-violet-300 text-xs">{{ open.grandes ? '−' : '+' }}</span>
       </button>
-      <div v-show="open.grandes" class="p-2 grid grid-cols-2 gap-1.5">
+      <div v-if="single.isActive && !hasCityHall" v-show="open.grandes" class="p-3 text-center text-[11px] text-white/40">🏛️ Construye Ayuntamiento para desbloquear</div>
+      <div v-else v-show="open.grandes" class="p-2 grid grid-cols-2 gap-1.5">
         <button
           v-for="tool in [
             { id: 'stadium', label: 'Estadio', icon: '🏟️', cost: BUILDINGS.stadium.cost, sub: '3×3' },
@@ -166,13 +182,14 @@ function btnBase(selected, color) {
       </div>
     </section>
 
-    <!-- 2b. MEGA — 11 grandes -->
+    <!-- 2b. MEGA — 11 grandes (bloqueado hasta Ayuntamiento) -->
     <section class="bg-slate-900/60 rounded-lg border border-slate-700/50 overflow-hidden">
       <button @click="toggle('mega')" class="w-full flex items-center justify-between px-3 py-2 bg-zinc-800 hover:bg-zinc-700 transition-colors">
         <span class="flex items-center gap-2 text-xs font-bold tracking-wider text-zinc-200"><span>🏛️</span> MEGA — 11 grandes <span class="text-zinc-400 font-normal">3×3 a 5×5</span></span>
         <span class="text-zinc-200 text-xs">{{ open.mega ? '−' : '+' }}</span>
       </button>
-      <div v-show="open.mega" class="p-2 grid grid-cols-2 gap-1.5">
+      <div v-if="single.isActive && !hasCityHall" v-show="open.mega" class="p-3 text-center text-[11px] text-white/40">🏛️ Construye Ayuntamiento para desbloquear</div>
+      <div v-else v-show="open.mega" class="p-2 grid grid-cols-2 gap-1.5">
         <button
           v-for="tool in [
             { id: 'city_hall', label: 'Ayuntamiento', icon: '🏛️', cost: BUILDINGS.city_hall.cost, sub: '3×3' },
@@ -188,9 +205,9 @@ function btnBase(selected, color) {
             { id: 'convention_center', label: 'Convenciones', icon: '🏢', cost: BUILDINGS.convention_center.cost, sub: '4×3' },
           ]"
           :key="tool.id"
-          @click="city.selectedTool = tool.id"
+          @click="!(single.isActive && !hasPower && ['solar_farm','nuclear_plant'].includes(tool.id)) && (city.selectedTool = tool.id)"
           class="p-2 rounded border text-xs flex flex-col gap-0.5"
-          :class="city.selectedTool===tool.id ? 'bg-zinc-600 border-white text-white ring-1 ring-white' : 'bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700'"
+          :class="[city.selectedTool===tool.id ? 'bg-zinc-600 border-white text-white ring-1 ring-white' : 'bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700', single.isActive && !hasPower && ['solar_farm','nuclear_plant'].includes(tool.id) ? 'opacity-40 pointer-events-none' : '']"
         >
           <span class="text-base">{{ tool.icon }}</span><span class="text-[10px] font-semibold leading-none">{{ tool.label }}</span><span class="text-[8px] opacity-60">{{ tool.sub }}</span><span class="text-[9px] font-mono text-zinc-300">${{ tool.cost }}</span>
         </button>
@@ -250,6 +267,65 @@ function btnBase(selected, color) {
       </div>
     </section>
 
+    <!-- PRODUCCIÓN UN JUGADOR — Comisaría / Colegio / Arsenal -->
+    <section v-if="single.isActive" class="bg-slate-900/60 rounded-lg border border-sky-700/50 overflow-hidden">
+      <button @click="toggle('produccion')" class="w-full flex items-center justify-between px-3 py-2 bg-sky-900/30 hover:bg-sky-900/40 transition-colors">
+        <span class="flex items-center gap-2 text-xs font-bold tracking-wider text-sky-300"><span>⚔️</span> PRODUCCIÓN — Unidades <span class="text-sky-500/60 font-normal">0-100% cola 4</span></span>
+        <span class="text-sky-300 text-xs">{{ open.produccion ? '−' : '+' }}</span>
+      </button>
+      <div v-show="open.produccion" class="p-2 space-y-2">
+        <div v-if="!hasPolice && !hasMil && !hasArs" class="text-[11px] text-white/40 text-center py-2">Construye Comisaría, Colegio Militar o Arsenal para desbloquear producción</div>
+        <template v-if="hasPolice">
+        <div class="text-[10px] font-bold text-sky-400">Comisaría → Policías</div>
+        <div class="grid grid-cols-2 gap-1.5">
+          <button @click="unitQueue.enqueue('police_station','police', single.humanPlayer()?.id || 'p0')" class="p-2 rounded border flex flex-col items-center gap-0.5 bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700">
+            <span class="text-base">👮</span><span class="text-[10px] font-semibold">Policía</span><span class="text-[9px] font-mono">$30 · 2.8s</span>
+          </button>
+          <button @click="unitQueue.enqueue('police_station','police_car', single.humanPlayer()?.id || 'p0')" class="p-2 rounded border flex flex-col items-center gap-0.5 bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700">
+            <span class="text-base">🚔</span><span class="text-[10px] font-semibold">Patrulla</span><span class="text-[9px] font-mono">$80 · 4s</span>
+          </button>
+        </div>
+        </template>
+        <template v-if="hasMil">
+        <div class="text-[10px] font-bold text-green-400">Colegio Militar → Soldados</div>
+        <div class="grid grid-cols-2 gap-1.5">
+          <button @click="unitQueue.enqueue('military_academy','soldier', single.humanPlayer()?.id || 'p0')" class="p-2 rounded border flex flex-col items-center gap-0.5 bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700">
+            <span class="text-base">🪖</span><span class="text-[10px] font-semibold">Soldado</span><span class="text-[9px] font-mono">$40 · 2.5s</span>
+          </button>
+          <button @click="unitQueue.enqueue('military_academy','soldier_heavy', single.humanPlayer()?.id || 'p0')" class="p-2 rounded border flex flex-col items-center gap-0.5 bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700">
+            <span class="text-base">🎖️</span><span class="text-[10px] font-semibold">Pesado</span><span class="text-[9px] font-mono">$60 · 3.2s</span>
+          </button>
+          <button @click="unitQueue.enqueue('military_academy','army_jeep', single.humanPlayer()?.id || 'p0')" class="p-2 rounded border flex flex-col items-center gap-0.5 bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700">
+            <span class="text-base">🚙</span><span class="text-[10px] font-semibold">Jeep</span><span class="text-[9px] font-mono">$90 · 3.8s</span>
+          </button>
+          <button @click="unitQueue.enqueue('military_academy','tank', single.humanPlayer()?.id || 'p0')" class="p-2 rounded border flex flex-col items-center gap-0.5 bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700">
+            <span class="text-base">🛡️</span><span class="text-[10px] font-semibold">Tanque</span><span class="text-[9px] font-mono">$180 · 6.5s</span>
+          </button>
+        </div>
+        </template>
+        <template v-if="hasArs">
+        <div class="text-[10px] font-bold text-zinc-400">Arsenal → Maquinaria/Cañones</div>
+        <div class="grid grid-cols-2 gap-1.5">
+          <button @click="unitQueue.enqueue('arsenal','tractor', single.humanPlayer()?.id || 'p0')" class="p-2 rounded border flex flex-col items-center gap-0.5 bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700">
+            <span class="text-base">🚜</span><span class="text-[10px] font-semibold">Tractor</span><span class="text-[9px] font-mono">$50 · 3s</span>
+          </button>
+          <button @click="unitQueue.enqueue('arsenal','cannon', single.humanPlayer()?.id || 'p0')" class="p-2 rounded border flex flex-col items-center gap-0.5 bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700">
+            <span class="text-base">💣</span><span class="text-[10px] font-semibold">Cañón</span><span class="text-[9px] font-mono">$120 · 5.5s</span>
+          </button>
+        </div>
+        </template>
+        <div v-if="unitQueue.queue.length" class="bg-slate-900 rounded border border-white/10 p-2 space-y-1">
+          <div class="text-[10px] font-bold text-white/60">Cola ({{ unitQueue.queue.length }})</div>
+          <div v-for="q in unitQueue.queue" :key="q.id" class="flex items-center gap-2 text-[11px] bg-slate-800 rounded px-2 py-1 border border-slate-700">
+            <span class="flex-1 truncate">{{ q.unitType }} @ {{ q.buildingId }}</span>
+            <span class="font-mono text-sky-300">{{ Math.round(q.progress) }}%</span>
+            <div class="w-16 h-1.5 bg-black/40 rounded-full overflow-hidden border border-white/10"><div class="h-full bg-sky-400" :style="{width: q.progress+'%'}"></div></div>
+          </div>
+        </div>
+        <p class="text-[10px] text-white/40 leading-tight">Requiere edificio construido junto a carretera. Cola máx 4 por edificio.</p>
+      </div>
+    </section>
+
     <!-- 2d. CULTURA / MONUMENTOS / INFRA -->
     <section class="bg-slate-900/60 rounded-lg border border-slate-700/50 overflow-hidden">
       <button @click="toggle('cultura')" class="w-full flex items-center justify-between px-3 py-2 bg-amber-900/20 hover:bg-amber-900/30 transition-colors">
@@ -281,13 +357,14 @@ function btnBase(selected, color) {
       </div>
     </section>
 
-    <!-- 2e. BANDERAS ONDEANDO -->
+    <!-- 2e. BANDERAS ONDEANDO (bloqueado hasta Ayuntamiento) -->
     <section class="bg-slate-900/60 rounded-lg border border-slate-700/50 overflow-hidden">
       <button @click="toggle('banderas')" class="w-full flex items-center justify-between px-3 py-2 bg-emerald-900/20 hover:bg-emerald-900/30 transition-colors">
         <span class="flex items-center gap-2 text-xs font-bold tracking-wider text-emerald-300"><span>🏳️</span> BANDERAS — Ondeando <span class="text-emerald-500/60 font-normal">15 países · 1×1</span></span>
         <span class="text-emerald-300 text-xs">{{ open.banderas ? '−' : '+' }}</span>
       </button>
-      <div v-show="open.banderas" class="p-2 grid grid-cols-4 gap-1">
+      <div v-if="single.isActive && !hasCityHall" v-show="open.banderas" class="p-3 text-center text-[11px] text-white/40">🏛️ Construye Ayuntamiento para desbloquear banderas</div>
+      <div v-else v-show="open.banderas" class="p-2 grid grid-cols-4 gap-1">
         <button
           v-for="tool in [
             { id: 'flag_mx', label: 'MX', icon: '🇲🇽', cost: 12 },
@@ -316,13 +393,14 @@ function btnBase(selected, color) {
       </div>
     </section>
 
-    <!-- 2f. MONUMENTOS MUNDIALES CON BANDERAS REALES — 20 países (Am Lat, Asia, África, Europa) -->
+    <!-- 2f. MONUMENTOS MUNDIALES CON BANDERAS REALES — 20 países (bloqueado hasta Museo) -->
     <section class="bg-slate-900/60 rounded-lg border border-slate-700/50 overflow-hidden">
       <button @click="toggle('mundial')" class="w-full flex items-center justify-between px-3 py-2 bg-sky-900/20 hover:bg-sky-900/30 transition-colors">
         <span class="flex items-center gap-2 text-xs font-bold tracking-wider text-sky-300"><span>🌍</span> MUNDIAL — Monumentos con banderas <span class="text-sky-500/60 font-normal">20 países</span></span>
         <span class="text-sky-300 text-xs">{{ open.mundial ? '−' : '+' }}</span>
       </button>
-      <div v-show="open.mundial" class="p-2 grid grid-cols-2 gap-1.5 max-h-[320px] overflow-auto">
+      <div v-if="single.isActive && !hasMuseum" v-show="open.mundial" class="p-3 text-center text-[11px] text-white/40">🖼️ Construye Museo para desbloquear mundial</div>
+      <div v-else v-show="open.mundial" class="p-2 grid grid-cols-2 gap-1.5 max-h-[320px] overflow-auto">
         <button
           v-for="tool in [
             { id: 'eiffel', label: 'Eiffel', icon: '🗼', cost: BUILDINGS.eiffel.cost, sub: '🇫🇷 2×2' },
@@ -365,6 +443,7 @@ function btnBase(selected, color) {
       <div v-show="open.infra" class="p-2 grid grid-cols-2 gap-1.5">
         <button
           v-for="tool in [
+            { id: 'arsenal', label: 'Arsenal', icon: '💣', cost: BUILDINGS.arsenal.cost, sub: '3×3 · 🚜→💣' },
             { id: 'power', label: 'Planta energía', icon: '⚡', cost: BUILDINGS.power.cost, sub: '2×2 · +25⚡' },
             { id: 'waterPlant', label: 'Planta agua', icon: '🏭', cost: BUILDINGS.waterPlant.cost, sub: '2×2 · +25💧' },
             { id: 'factory', label: 'Fábrica', icon: '🏭', cost: BUILDINGS.factory.cost, sub: '3×2 · +22💰' },
@@ -375,9 +454,12 @@ function btnBase(selected, color) {
             { id: 'recycling_plant', label: 'Reciclaje', icon: '♻️', cost: BUILDINGS.recycling_plant.cost, sub: '+6 O₂' },
           ]"
           :key="tool.id"
-          @click="city.selectedTool = tool.id"
+          @click="!(single.isActive && !hasPower && ['solar_farm','nuclear_plant'].includes(tool.id)) && (city.selectedTool = tool.id)"
           class="p-2 rounded border text-xs text-left"
-          :class="city.selectedTool===tool.id ? 'bg-amber-500/20 border-amber-500 text-amber-300 ring-1 ring-amber-500' : 'bg-slate-800 border-slate-700 text-white/70'"
+          :class="[
+            city.selectedTool===tool.id ? 'bg-amber-500/20 border-amber-500 text-amber-300 ring-1 ring-amber-500' : 'bg-slate-800 border-slate-700 text-white/70',
+            single.isActive && !hasPower && ['solar_farm','nuclear_plant'].includes(tool.id) ? 'opacity-40 pointer-events-none' : ''
+          ]"
         >
           <div class="flex items-center gap-1.5"><span>{{ tool.icon }}</span><span class="font-semibold text-[11px]">{{ tool.label }}</span></div>
           <div class="text-[9px] opacity-60">{{ tool.sub }}</div>

@@ -109,7 +109,9 @@ function scheduleAutoNext() {
     fadeTo(0, 1.6)
     fadeTimeout = setTimeout(() => {
       const nextId = TRACK_ORDER[(currentIndex + 1) % TRACK_ORDER.length]
-      play(nextId, true)
+      currentTrackId = nextId
+      currentIndex = TRACK_ORDER.indexOf(nextId)
+      playChiptune(TRACKS[nextId], true)
     }, 1700)
   }, 120000)
 }

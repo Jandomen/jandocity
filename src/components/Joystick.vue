@@ -48,7 +48,7 @@ function end() {
     >
       <div class="w-[44px] h-[44px] rounded-full bg-white/20 border border-white/30 shadow"
            :style="{ transform: `translate(${dx*28}px, ${dy*28}px)` }"></div>
-      <div class="absolute text-white/60 text-[10px] font-bold pointer-events-none">◉ JANDOCITY</div>
+      <div class="absolute text-white/60 text-[10px] font-bold pointer-events-none">◉ JANDOSOFT</div>
     </div>
     <div class="text-center text-[10px] text-white/50 mt-1">desliza para mover</div>
   </div>

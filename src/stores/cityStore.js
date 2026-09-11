@@ -395,12 +395,106 @@ export const useCityStore = defineStore('city', () => {
     }
   }
 
+  function forcePlaceBuilding(x, y, toolId, owner = null) {
+    const pos = ensureGridContains(x, y)
+    x = pos.x; y = pos.y
+    const cell = getCell(x, y)
+    if (!cell) return { ok: false, reason: 'Coordenada fuera del mapa' }
+    // sin check de dinero (ya cobrado)
+    const validation = canPlaceAt(grid.value, x, y, toolId, 999999)
+    if (!validation.ok) return validation
+    const building = BUILDING_TYPES[toolId]
+    const w = building.width || 1, h = building.height || 1
+    const ROAD_IDS = ['road','dirt_road','concrete_road','cobble_road']
+    const isRail = toolId === 'rail'
+    const isRoad = ROAD_IDS.includes(toolId)
+    const existingIsRoad = ROAD_IDS.includes(cell.buildingId) || cell.hasRoad
+    const existingIsRail = cell.buildingId === 'rail' || cell.hasRail
+    if (isRail && existingIsRoad) {
+      cell.hasRail = true
+      cell.railVariant = selectedRailVariant.value !== 'auto' ? selectedRailVariant.value : (cell.railVariant || selectedRailVariant.value)
+      cell.visibility = 'visible'; if (owner) cell.owner = owner
+    } else if (isRoad && existingIsRail) {
+      cell.hasRoad = true
+      cell.roadVariant = selectedRoadVariant.value !== 'auto' ? selectedRoadVariant.value : (cell.roadVariant || selectedRoadVariant.value)
+      cell.visibility = 'visible'; if (!cell.hasRail) cell.hasRail = true; if (owner) cell.owner = owner
+    } else {
+      cell.buildingId = toolId
+      cell.isOrigin = true; cell.isChild = false; cell.occupiedBy = null; cell.visibility = 'visible'
+      cell.hasRoad = isRoad; cell.hasRail = isRail
+      if (owner) cell.owner = owner
+      if (ROAD_IDS.includes(toolId) && selectedRoadVariant.value !== 'auto') cell.roadVariant = selectedRoadVariant.value
+      else if (ROAD_IDS.includes(toolId)) cell.roadVariant = null
+      if (isRail && selectedRailVariant.value !== 'auto') cell.railVariant = selectedRailVariant.value
+      else if (isRail) cell.railVariant = null
+    }
+    const WALL_IDS = ['fence','wall','hedge','brick_wall','metal_fence','gate']
+    if (WALL_IDS.includes(toolId) && selectedWallVariant.value !== 'auto') cell.wallVariant = selectedWallVariant.value
+    else if (WALL_IDS.includes(toolId)) cell.wallVariant = null
+    for (let dy = 0; dy < h; dy++) for (let dx = 0; dx < w; dx++) {
+      if (dx === 0 && dy === 0) continue
+      const cx = x + dx, cy = y + dy
+      const child = getCell(cx, cy)
+      if (child) { child.occupiedBy = { x, y }; child.isChild = true; child.isOrigin = false; child.buildingId = null; child.visibility = 'visible'; if (owner) child.owner = owner }
+    }
+    syncDerivedResources(); updateFogOfWar(x, y, toolId === 'road' ? 3 : 4)
+    log(`Construido ${building.label} ${w}×${h} en (${x},${y}) -${building.cost}💰`)
+    immediateSave(); scheduleSave(800)
+    return { ok: true }
+  }
+
+  function placeBuildingAt(x, y, toolId, owner = null) {
+    const pos = ensureGridContains(x, y)
+    x = pos.x; y = pos.y
+    const cell = getCell(x, y)
+    if (!cell) return { ok: false, reason: 'Coordenada fuera del mapa' }
+    const validation = canPlaceAt(grid.value, x, y, toolId, money.value)
+    if (!validation.ok) return validation
+    const building = BUILDING_TYPES[toolId]
+    const w = building.width || 1, h = building.height || 1
+    money.value -= building.cost
+    const ROAD_IDS = ['road','dirt_road','concrete_road','cobble_road']
+    const isRail = toolId === 'rail'
+    const isRoad = ROAD_IDS.includes(toolId)
+    const existingIsRoad = ROAD_IDS.includes(cell.buildingId) || cell.hasRoad
+    const existingIsRail = cell.buildingId === 'rail' || cell.hasRail
+    if (isRail && existingIsRoad) {
+      cell.hasRail = true
+      cell.railVariant = selectedRailVariant.value !== 'auto' ? selectedRailVariant.value : (cell.railVariant || selectedRailVariant.value)
+      cell.visibility = 'visible'; if (owner) cell.owner = owner
+    } else if (isRoad && existingIsRail) {
+      cell.hasRoad = true
+      cell.roadVariant = selectedRoadVariant.value !== 'auto' ? selectedRoadVariant.value : (cell.roadVariant || selectedRoadVariant.value)
+      cell.visibility = 'visible'; if (!cell.hasRail) cell.hasRail = true; if (owner) cell.owner = owner
+    } else {
+      cell.buildingId = toolId
+      cell.isOrigin = true; cell.isChild = false; cell.occupiedBy = null; cell.visibility = 'visible'
+      cell.hasRoad = isRoad; cell.hasRail = isRail
+      if (owner) cell.owner = owner
+      if (ROAD_IDS.includes(toolId) && selectedRoadVariant.value !== 'auto') cell.roadVariant = selectedRoadVariant.value
+      else if (ROAD_IDS.includes(toolId)) cell.roadVariant = null
+      if (isRail && selectedRailVariant.value !== 'auto') cell.railVariant = selectedRailVariant.value
+      else if (isRail) cell.railVariant = null
+    }
+    const WALL_IDS = ['fence','wall','hedge','brick_wall','metal_fence','gate']
+    if (WALL_IDS.includes(toolId) && selectedWallVariant.value !== 'auto') cell.wallVariant = selectedWallVariant.value
+    else if (WALL_IDS.includes(toolId)) cell.wallVariant = null
+    for (let dy = 0; dy < h; dy++) for (let dx = 0; dx < w; dx++) {
+      if (dx === 0 && dy === 0) continue
+      const cx = x + dx, cy = y + dy
+      const child = getCell(cx, cy)
+      if (child) { child.occupiedBy = { x, y }; child.isChild = true; child.isOrigin = false; child.buildingId = null; child.visibility = 'visible'; if (owner) child.owner = owner }
+    }
+    syncDerivedResources(); updateFogOfWar(x, y, toolId === 'road' ? 3 : 4)
+    log(`Construido ${building.label} ${w}×${h} en (${x},${y}) -${building.cost}💰`)
+    immediateSave(); scheduleSave(800)
+    return { ok: true }
+  }
+
   function demolish(x, y) {
     console.log(`[${new Date().toLocaleTimeString()}] [Jandocity] demolish`, x, y)
     const cell = getCell(x, y)
     if (!cell) return { ok: false, reason: 'Fuera del mapa' }
-
-    // Resolver origen si es hijo
     let origin = cell
     let ox = x, oy = y
     if (cell.isChild && cell.occupiedBy) {
@@ -408,7 +502,6 @@ export const useCityStore = defineStore('city', () => {
       oy = cell.occupiedBy.y
       origin = getCell(ox, oy)
     }
-
     if (origin && origin.buildingId) {
       const building = BUILDING_TYPES[origin.buildingId]
       const refund = Math.floor(building.cost * 0.5)
@@ -416,6 +509,7 @@ export const useCityStore = defineStore('city', () => {
       log(`Demolido ${building.label} en (${ox},${oy}) +${refund}💰`)
       const w = building.width || 1
       const h = building.height || 1
+      const rubbleCells = []
       for (let dy = 0; dy < h; dy++) {
         for (let dx = 0; dx < w; dx++) {
           const cx = ox + dx, cy = oy + dy
@@ -430,8 +524,22 @@ export const useCityStore = defineStore('city', () => {
             c.roadVariant = null
             c.railVariant = null
             c.wallVariant = null
+            c.terrain = 'rubble'
+            c.terrainType = 'rubble'
+            rubbleCells.push({ x: cx, y: cy })
           }
         }
+      }
+      // escombros → café tierra (12s) → verde pasto (25s después) — pero si construyes encima, se respeta
+      for (const rc of rubbleCells) {
+        setTimeout(() => {
+          const cc = getCell(rc.x, rc.y)
+          if (cc && cc.terrain === 'rubble' && !cc.buildingId && !cc.isChild) { cc.terrain = 'dirt'; cc.terrainType = 'dirt' }
+        }, 12000)
+        setTimeout(() => {
+          const cc2 = getCell(rc.x, rc.y)
+          if (cc2 && cc2.terrain === 'dirt' && !cc2.buildingId && !cc2.isChild) { cc2.terrain = 'grass'; cc2.terrainType = 'grass' }
+        }, 37000)
       }
       syncDerivedResources()
       immediateSave()
@@ -850,6 +958,8 @@ export const useCityStore = defineStore('city', () => {
     getCell,
     selectTool,
     placeBuilding,
+    placeBuildingAt,
+    forcePlaceBuilding,
     demolish,
     fillTerrain,
     setTerrain,

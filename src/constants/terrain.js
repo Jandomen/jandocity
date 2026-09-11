@@ -106,6 +106,15 @@ export const TERRAIN_TYPES = {
     costModifier: 1,
     palette: ['#78716c', '#57534e', '#a8a29e'],
     decoration: []
+  },
+  rubble: {
+    id: 'rubble',
+    label: 'Escombros',
+    buildable: true,
+    walkable: true,
+    costModifier: 1,
+    palette: ['#57534e', '#44403c', '#78716c', '#292524'],
+    decoration: []
   }
 }
 

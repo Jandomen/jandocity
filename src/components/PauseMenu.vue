@@ -1,13 +1,20 @@
 <script setup>
 import { ref } from 'vue'
 import AudioControls from '@/components/AudioControls.vue'
+import MiniMap from '@/components/MiniMap.vue'
+import { useSinglePlayerStore } from '@/stores/singlePlayerStore.js'
+import { useCityStore } from '@/stores/cityStore.js'
+import { useTrafficStore } from '@/stores/trafficStore.js'
 
 defineProps({
   show: { type: Boolean, default: false },
   joystickType: { type: String, default: 'thumb' } // thumb | dpad
 })
-const emit = defineEmits(['resume','exit','update:joystickType'])
-const tab = ref('main') // main | audio | controls
+const emit = defineEmits(['resume','exit','surrender','update:joystickType'])
+const tab = ref('main') // main | audio | controls | map
+const single = useSinglePlayerStore()
+const city = useCityStore()
+const traffic = useTrafficStore()
 function setJoystick(t) { emit('update:joystickType', t) }
 </script>
 
@@ -26,6 +33,13 @@ function setJoystick(t) { emit('update:joystickType', t) }
           <!-- tabs main -->
           <template v-if="tab==='main'">
             <button @click="emit('resume')" class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm">▶ Reanudar</button>
+            <button @click="tab='map'" class="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-white font-bold text-sm flex items-center justify-center gap-2">🗺️ Mapa <span class="text-white/40">›</span></button>
+            <div class="grid grid-cols-4 gap-2">
+              <button @click="city.isPaused ? city.resume() : city.pause()" class="py-2.5 rounded-xl border text-xs font-bold" :class="city.isPaused ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-amber-600 border-amber-500 text-white'">{{ city.isPaused ? '▶' : '⏸' }}</button>
+              <button @click="city.saveCity()" class="py-2.5 rounded-xl bg-sky-700 hover:bg-sky-600 text-white text-xs font-bold border border-sky-600">💾 Guardar</button>
+              <button @click="city.loadCity()" class="py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold border border-white/10">📂 Cargar</button>
+              <button @click="city.resetCity()" class="py-2.5 rounded-xl bg-red-800 hover:bg-red-700 text-white text-xs font-bold border border-red-700">🔄 Reset</button>
+            </div>
             <button @click="tab='audio'" class="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-white font-bold text-sm flex items-center justify-center gap-2">🔊 Configuración de Audio <span class="text-white/40">›</span></button>
             <button @click="tab='controls'" class="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-white font-bold text-sm flex items-center justify-center gap-2">🎮 Controles <span class="text-white/40">›</span></button>
 
@@ -39,7 +53,17 @@ function setJoystick(t) { emit('update:joystickType', t) }
               <p class="text-[10px] text-white/40 mt-1.5 leading-tight">Cambia entre palanca circular y D-Pad. Se guarda local.</p>
             </div>
 
+            <button v-if="single.isActive" @click="emit('surrender')" class="w-full py-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm border border-amber-500/30">🏳️ Claudicar</button>
             <button @click="emit('exit')" class="w-full py-3 rounded-xl bg-red-600/80 hover:bg-red-600 text-white font-bold text-sm border border-red-500/30">‹ Salir al menú (mundos)</button>
+            <div v-if="single.isActive" class="bg-slate-800/60 rounded-xl border border-white/10 p-3">
+              <div class="text-xs font-bold text-white/80">📊 Métricas</div>
+              <div class="text-[11px] text-white/60 leading-tight">
+                Tus edificios: {{ city.flatGrid.filter(c=>c.isOrigin && c.owner===single.humanPlayer()?.id).length }}<br>
+                CPU edificios: {{ city.flatGrid.filter(c=>c.isOrigin && c.owner && c.owner!==single.humanPlayer()?.id).length }}<br>
+                Tus unidades: {{ traffic.pedestrians.filter(p=>p.owner===single.humanPlayer()?.id).length + traffic.vehicles.filter(v=>v.owner===single.humanPlayer()?.id).length }}<br>
+                CPU unidades: {{ traffic.pedestrians.filter(p=>p.owner && p.owner!==single.humanPlayer()?.id).length + traffic.vehicles.filter(v=>v.owner && v.owner!==single.humanPlayer()?.id).length }}
+              </div>
+            </div>
           </template>
 
           <!-- audio tab -->
@@ -66,9 +90,14 @@ function setJoystick(t) { emit('update:joystickType', t) }
               </div>
             </div>
           </template>
+
+          <!-- map tab -->
+          <template v-else-if="tab==='map'">
+            <MiniMap :show="true" @close="tab='main'" />
+          </template>
         </div>
 
-        <div class="shrink-0 px-4 py-2 border-t border-white/10 bg-slate-800/40 text-center text-[10px] text-white/30">JANDOCITY • Pausa</div>
+        <div class="shrink-0 px-4 py-2 border-t border-white/10 bg-slate-800/40 text-center text-[10px] text-white/30">JANDOSOFT • Pausa</div>
       </div>
     </div>
   </Transition>

@@ -229,6 +229,20 @@ export function useServiceSpawns(opts = {}) {
       if (jeeps < maxJeep && Math.random() < 0.16) traffic.addVehicle(road.x, road.y, 'army_jeep')
       if (tanks < maxTank && Math.random() < 0.08) traffic.addVehicle(road.x, road.y, 'tank')
     }
+
+    // arsenal → tractores → cañones de guerra
+    const arsenalOrigins = city.flatGrid.filter(c => c.isOrigin && c.buildingId==='arsenal')
+    for (const o of arsenalOrigins) {
+      const b = BUILDING_TYPES[o.buildingId]
+      const road = findRoadNear(city, o.x, o.y, b.width, b.height)
+      if (!road) continue
+      const tractors = traffic.vehicles.filter(v => v.type==='tractor').length
+      const cannons = traffic.vehicles.filter(v => v.type==='cannon').length
+      const maxTrac = Math.min(6, arsenalOrigins.length * 3)
+      const maxCan = Math.min(4, arsenalOrigins.length * 2)
+      if (tractors < maxTrac && Math.random() < 0.22) traffic.addVehicle(road.x, road.y, 'tractor')
+      if (cannons < maxCan && Math.random() < 0.12) traffic.addVehicle(road.x, road.y, 'cannon')
+    }
   }
 
   function start(interval = 9000) {

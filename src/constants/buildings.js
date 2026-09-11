@@ -985,6 +985,17 @@ export const BUILDING_TYPES = {
     color: 'bg-green-900',
     description: '3×3 · spawnea soldados y vehículos ejército'
   },
+  arsenal: {
+    id: 'arsenal',
+    label: 'Arsenal',
+    icon: '💣',
+    width: 3, height: 3,
+    cost: 720,
+    effects: { population: 0, energy: -10, water: -4, oxygen: -8 },
+    incomePerTick: 18,
+    color: 'bg-zinc-800',
+    description: '3×3 · fabrica tractores → cañones de guerra'
+  },
   factory: {
     id: 'factory',
     label: 'Fábrica',

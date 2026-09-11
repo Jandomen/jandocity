@@ -16,9 +16,27 @@ import MainMenu from '@/components/MainMenu.vue'
 import WorldManager from '@/components/WorldManager.vue'
 import LoadingScreen from '@/components/LoadingScreen.vue'
 import PauseMenu from '@/components/PauseMenu.vue'
+import ChatBox from '@/components/ChatBox.vue'
+import SinglePlayerSetup from '@/components/SinglePlayerSetup.vue'
+import VictoryOverlay from '@/components/VictoryOverlay.vue'
+import AuthModal from '@/components/Auth/AuthModal.vue'
+import OfflineBanner from '@/components/OfflineBanner.vue'
+import MultiplayerLobby from '@/components/Multiplayer/MultiplayerLobby.vue'
+import EnteringServer from '@/components/Multiplayer/EnteringServer.vue'
+import Returning from '@/components/Multiplayer/Returning.vue'
 import { useAudioManager } from '@/audio/audioManager.js'
 import { getWorld, setActiveWorldId, getActiveWorldId, clearActiveWorldId, updateWorldData } from '@/utils/worldPersistence.js'
 import { useServiceSpawns } from '@/composables/useServiceSpawns.js'
+import { useSinglePlayerStore } from '@/stores/singlePlayerStore.js'
+import { useBuildQueue } from '@/composables/useBuildQueue.js'
+import { useUnitQueue } from '@/composables/useUnitQueue.js'
+import { useSingleAI } from '@/composables/useSingleAI.js'
+import { useTrafficStore } from '@/stores/trafficStore.js'
+import { useVictory } from '@/composables/useVictory.js'
+import { supabase } from '@/lib/supabase.js'
+import { useMultiplayerSync } from '@/composables/useMultiplayerSync.js'
+import { useKeepAlive } from '@/composables/useKeepAlive.js'
+import { APP_URL } from '@/config.js'
 
 const city = useCityStore()
 const player = usePlayerStore()
@@ -26,26 +44,93 @@ const player = usePlayerStore()
 useAudioEvents(city)
 const audioMgr = useAudioManager()
 
-// Flujo: splash (2s) -> menu -> worlds / loading -> playing
-const appState = ref('splash') // splash | menu | loading | worlds | playing
+// Flujo: splash (2s) -> menu -> worlds / loading -> playing + singleSetup + multiLobby + enteringMulti/returning
+const appState = ref('splash') // splash | menu | loading | worlds | playing | singleSetup | multiLobby | enteringMulti | returning
+const multiRoom = ref(null)
 const loadingText = ref('Cargando...')
 const loadingSub = ref('')
 const activeWorldId = ref(getActiveWorldId() || null)
 const showUI = ref(true)
 const isPaused = ref(false)
 const joystickType = ref(localStorage.getItem('jandocity-joystick') || 'thumb')
+const showChat = ref(false)
+const single = useSinglePlayerStore()
+const buildQueue = useBuildQueue()
+const unitQueue = useUnitQueue()
+const singleAI = useSingleAI()
+const traffic = useTrafficStore()
+const victory = useVictory()
+const keepAlive = useKeepAlive()
+const showVictory = ref(false)
+const victoryData = ref(null)
+const showAuth = ref(false)
+const pendingMulti = ref(false)
+const chatMessages = ref([])
+const multiSync = useMultiplayerSync()
+function onAuthenticated() { showAuth.value=false; if(pendingMulti.value){ pendingMulti.value=false; handleMenuSelect('multi') } }
+const botPhrases = ['Construyendo…','Avanzando con cautela','Reforzando defensas','En camino','Posicionando unidades','Ajustando estrategia']
+function sendChat(text) {
+  chatMessages.value.push({ id: Date.now() + Math.random(), sender: 'Tú', text, time: new Date().toLocaleTimeString() })
+  if (multiRoom.value) {
+    multiSync.broadcastChat(text, 'Tú')
+  } else if (single.isActive) {
+    setTimeout(() => {
+      const cpu = single.players.find(p=>!p.isHuman)
+      const reply = botPhrases[Math.floor(Math.random()*botPhrases.length)]
+      chatMessages.value.push({ id: Date.now()+Math.random(), sender: cpu ? `CPU ${cpu.color}` : 'CPU', text: reply, time: new Date().toLocaleTimeString() })
+      if (chatMessages.value.length > 80) chatMessages.value.shift()
+    }, 900 + Math.random()*800)
+  }
+  if (chatMessages.value.length > 80) chatMessages.value.shift()
+}
+function toggleChat() { showChat.value = !showChat.value }
+function surrender() {
+  const m = victory.metrics()
+  victoryData.value = { isWin: false, winner: single.players.find(p=>!p.isHuman), metrics: m }
+  showVictory.value = true
+  isPaused.value = true
+  city.pause()
+  singleAI.stop()
+  serviceSpawns.stop()
+}
+function closeVictory(toMenu=true) {
+  showVictory.value = false
+  victoryData.value = null
+  if (toMenu) exitToMenu()
+  else {
+    // revancha: reinicia misma config
+    const n = single.enemyCount
+    const team = single.players.some(p=>p.team==='A' && !p.isHuman) ? '2vs2' : '1vs3'
+    handleSingleStart()
+  }
+}
 
 watch(joystickType, (v) => { try { localStorage.setItem('jandocity-joystick', v) } catch {} })
 
 const serviceSpawns = useServiceSpawns()
 
 useGameLoop(() => {
-  if (appState.value === 'playing' && !isPaused.value) city.tick()
+  if (appState.value === 'playing' && !isPaused.value) {
+    city.tick()
+    // check victoria solo en single
+    if (single.isActive) {
+      const res = victory.check()
+      if (res) {
+        const m = victory.metrics()
+        victoryData.value = { isWin: res.isWin, winner: res.winner, metrics: m }
+        showVictory.value = true
+        isPaused.value = true
+        city.pause()
+        singleAI.stop()
+        serviceSpawns.stop()
+      }
+    }
+  }
 }, { interval: 2000 })
 
 watch(() => [appState.value, isPaused.value], ([state, paused]) => {
-  if (state === 'playing' && !paused) serviceSpawns.start()
-  else serviceSpawns.stop()
+  if (state === 'playing' && !paused) { serviceSpawns.start(); if (single.isActive) singleAI.start() }
+  else { serviceSpawns.stop(); singleAI.stop() }
 })
 
 function togglePause() {
@@ -60,8 +145,14 @@ function onKeydown(e) {
   if (appState.value !== 'playing') return
   const tag = document.activeElement?.tagName
   const isTyping = tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable
+  // T → chat (web)
+  if (e.key.toLowerCase() === 't' && !e.ctrlKey && !e.metaKey && !e.altKey && !isTyping) {
+    e.preventDefault()
+    showChat.value = true
+    return
+  }
   if (e.key.toLowerCase() === 'h' && !e.ctrlKey && !e.metaKey && !e.altKey && !isTyping) {
-    if (!isPaused.value) showUI.value = !showUI.value
+    if (!isPaused.value && !showChat.value) showUI.value = !showUI.value
   }
   if (e.key.toLowerCase() === 'n' && !isTyping && !e.ctrlKey && !e.metaKey) {
     audioMgr.init()
@@ -70,36 +161,82 @@ function onKeydown(e) {
     if (city.logs.length > 50) city.logs.pop()
   }
   if (e.key.toLowerCase() === 'escape' && !isTyping) {
+    if (showChat.value) { showChat.value = false; return }
     togglePause()
   }
 }
 
 function handleMenuSelect(mode) {
   if (mode === 'free') {
+    single.isActive = false
+    buildQueue.clear()
+    unitQueue.clear()
     loadingText.value = 'Cargando...'
     loadingSub.value = 'Preparando tus mundos locales'
     appState.value = 'loading'
     setTimeout(() => { appState.value = 'worlds' }, 700)
   } else if (mode === 'single') {
-    loadingText.value = 'Entrando al servidor...'
-    loadingSub.value = 'Conectando con Jandocity • Supabase (próximamente)'
-    appState.value = 'loading'
-    setTimeout(() => {
-      appState.value = 'menu'
-      city.logs.unshift('[Sistema] Un jugador — Próximamente: requiere cuenta Jandocity + Supabase')
-    }, 1600)
+    // Un jugador offline vs CPU — sin Supabase
+    appState.value = 'singleSetup'
+    return
   } else if (mode === 'multi') {
-    loadingText.value = 'Entrando al servidor...'
-    loadingSub.value = 'Buscando partida multijugador • modo Age of Empires (próximamente)'
-    appState.value = 'loading'
-    setTimeout(() => {
-      appState.value = 'menu'
-      city.logs.unshift('[Sistema] Multijugador — Próximamente: elimina al rival para ganar')
-    }, 1600)
+    supabase.auth.getSession().then(({ data }) => {
+      if (!data.session) { showAuth.value = true; pendingMulti.value = true; return }
+      appState.value = 'multiLobby'
+    })
   }
 }
 
+function handleSingleStart() {
+  loadingText.value = 'Generando partida...'
+  loadingSub.value = `${single.totalPlayers} jugadores — ${single.playerColor} vs CPU`
+  appState.value = 'loading'
+  setTimeout(() => {
+    city.resetCity()
+    city.syncDerivedResources()
+    // colocar jugador en su esquina azul
+    const human = single.humanPlayer()
+    if (human) player.setPos(human.x, human.y)
+    activeWorldId.value = null
+    buildQueue.clear()
+    unitQueue.clear()
+    appState.value = 'playing'
+    showUI.value = true
+    isPaused.value = false
+  }, 700)
+}
+function handleMultiStart(room) {
+  // solo anfitrión puede iniciar cuando todos confirmen (8 max)
+  if (room.players.length < 2) { city.logs.unshift('[Multi] Necesitas al menos 2 para iniciar'); return }
+  // requiere que todos hayan confirmado (campo ready) — si no, espera
+  const notReady = room.players.filter(p=>!p.ready).length
+  if (notReady > 0) { city.logs.unshift(`[Multi] Esperando ${notReady} confirmaciones`); return }
+  multiRoom.value = room
+  appState.value = 'enteringMulti'
+  setTimeout(() => {
+    city.resetCity()
+    city.syncDerivedResources()
+    activeWorldId.value = null
+    buildQueue.clear()
+    unitQueue.clear()
+    multiSync.join(room.key)
+    // reconexión automática vía Supabase Realtime + OfflineBanner
+    window.addEventListener('multi-chat', (e) => {
+      const d = e.detail
+      chatMessages.value.push({ id: Date.now()+Math.random(), sender: d.sender, text: d.text, time: d.time })
+      if (chatMessages.value.length > 80) chatMessages.value.shift()
+    })
+    // al construir, CityGrid broadcastBuild vía watcher abajo
+    appState.value = 'playing'
+    showUI.value = true
+    isPaused.value = false
+  }, 900)
+}
+
 function handlePlay(worldId) {
+  single.isActive = false
+  buildQueue.clear()
+  unitQueue.clear()
   loadingText.value = 'Cargando mundo...'
   loadingSub.value = 'Generando terreno y edificios'
   appState.value = 'loading'
@@ -124,6 +261,12 @@ function handlePlay(worldId) {
 }
 
 function exitToMenu() {
+  if (multiRoom.value) {
+    appState.value = 'returning'
+    multiSync.leave()
+    setTimeout(() => { multiRoom.value = null; appState.value = 'menu' }, 700)
+    return
+  }
   // guardar mundo actual antes de salir
   if (activeWorldId.value) {
     try { updateWorldData(activeWorldId.value, city.getSaveData()) } catch {}
@@ -131,7 +274,13 @@ function exitToMenu() {
     try { city.flushSave() } catch {}
   }
   isPaused.value = false
+  showVictory.value = false
   city.resume()
+  single.isActive = false
+  buildQueue.clear()
+  unitQueue.clear()
+  singleAI.stop()
+  serviceSpawns.stop()
   appState.value = 'menu'
   loadingText.value = 'Cargando...'
 }
@@ -147,6 +296,7 @@ watch(() => [city.money, city.tickCount], () => {
 })
 
 onMounted(() => {
+  keepAlive.start()
   // Splash 2s
   setTimeout(() => { appState.value = 'menu' }, 2000)
 
@@ -194,6 +344,7 @@ onUnmounted(() => {
 <template>
   <!-- Viewport entero fullscreen — 100dvh para APK sin barras -->
   <div class="relative w-screen h-[100dvh] h-screen overflow-hidden bg-[#0f172a] text-slate-100 font-sans antialiased">
+    <OfflineBanner />
     <!-- Splash 2s -->
     <SplashScreen v-if="appState==='splash'" />
 
@@ -206,19 +357,30 @@ onUnmounted(() => {
     <!-- Gestor de mundos locales -->
     <WorldManager v-else-if="appState==='worlds'" @play="handlePlay" @back="appState='menu'" />
 
+    <!-- Un jugador setup -->
+    <SinglePlayerSetup v-else-if="appState==='singleSetup'" @start="handleSingleStart" @back="appState='menu'" />
+
+    <!-- Multi lobby -->
+    <MultiplayerLobby v-else-if="appState==='multiLobby'" @start="handleMultiStart" @back="appState='menu'" />
+    <EnteringServer v-else-if="appState==='enteringMulti'" :roomKey="multiRoom?.key" />
+    <Returning v-else-if="appState==='returning'" />
+
     <!-- Juego -->
     <template v-else-if="appState==='playing'">
-      <CityGrid :show-ui="showUI && !isPaused" class="absolute inset-0 w-full h-full overflow-hidden bg-[#22c55e]" @toggleUi="showUI = !showUI" />
+      <CityGrid :show-ui="showUI && !isPaused" class="absolute inset-0 w-full h-full overflow-hidden bg-[#22c55e]" @toggleUi="showUI = !showUI" @openChat="showChat=true" />
       <Joystick v-if="joystickType==='thumb'" />
       <DPad v-else />
-      <div class="absolute top-2 right-2 z-20 md:hidden bg-black/50 backdrop-blur px-2 py-1 rounded-full text-[10px] text-white/70 border border-white/10 pointer-events-none">JANDOCITY • {{ activeWorldId ? 'mundo local' : 'offline' }} ✓</div>
+      <div class="absolute top-2 right-2 z-20 md:hidden bg-black/50 backdrop-blur px-2 py-1 rounded-full text-[10px] text-white/70 border border-white/10 pointer-events-none">JANDOSOFT • {{ activeWorldId ? 'mundo local' : 'offline' }} ✓</div>
 
       <Transition name="fade">
         <ResourceBar v-show="showUI" class="absolute top-0 left-0 right-0 z-30" />
       </Transition>
 
-      <!-- Botón pausa (Esc) + salir -->
-      <button @click="togglePause" class="absolute top-[42px] md:top-[40px] right-2 z-30 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur border border-white/15 text-[11px] text-white/80 hover:bg-black/70">{{ isPaused ? '▶' : '⏸' }} Pausa (Esc)</button>
+      <!-- Botón pausa (Esc) + chat T -->
+      <div class="absolute top-[42px] md:top-[40px] right-2 z-30 flex items-center gap-1.5">
+        <button @click="showChat=true" class="hidden md:flex px-2.5 py-1 rounded-full bg-sky-600/80 backdrop-blur border border-white/15 text-[11px] text-white hover:bg-sky-600 gap-1 items-center">💬 Chat <span class="bg-white text-sky-700 px-1 rounded text-[9px] font-black">T</span></button>
+        <button @click="togglePause" class="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur border border-white/15 text-[11px] text-white/80 hover:bg-black/70">{{ isPaused ? '▶' : '⏸' }} Pausa (Esc)</button>
+      </div>
 
       <!-- Desktop: panel izquierdo -->
       <Transition name="slide-left">
@@ -227,11 +389,17 @@ onUnmounted(() => {
           <AudioControls class="shadow-[0_12px_40px_rgba(0,0,0,0.5)] rounded-xl" />
         </div>
       </Transition>
-      <!-- Móvil: carrusel inferior extendido + modal centrado con X (oculto en pausa) -->
-      <MobileToolCarousel v-if="!isPaused" :showUI="showUI" />
+      <!-- Móvil: carrusel inferior extendido + modal centrado con X (oculto en pausa/chat) -->
+      <MobileToolCarousel v-if="!isPaused && !showChat" :showUI="showUI" />
+
+      <!-- Chat overlay — T web / 💬 móvil, listo para multijugador -->
+      <ChatBox :show="showChat" :messages="chatMessages" @send="sendChat" @close="showChat=false" />
 
       <!-- Overlay pausa — web Esc y móvil -->
-      <PauseMenu :show="isPaused" :joystickType="joystickType" @resume="resumeGame" @exit="exitToMenu" @update:joystickType="joystickType=$event" />
+      <PauseMenu :show="isPaused && !showVictory" :joystickType="joystickType" @resume="resumeGame" @exit="exitToMenu" @surrender="surrender" @update:joystickType="joystickType=$event" />
+
+      <!-- Victoria / Derrota -->
+      <VictoryOverlay :show="showVictory" :isWin="victoryData?.isWin" :winner="victoryData?.winner" :metrics="victoryData?.metrics" @menu="closeVictory(true)" @rematch="closeVictory(false)" />
 
       <Transition name="fade">
         <div v-show="showUI" class="hidden md:flex absolute bottom-3 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
@@ -248,6 +416,8 @@ onUnmounted(() => {
         </div>
       </Transition>
     </template>
+    <!-- Auth multijugador (fuera de la cadena v-if) -->
+    <AuthModal :show="showAuth" @close="showAuth=false" @authenticated="onAuthenticated" />
   </div>
 </template>
 

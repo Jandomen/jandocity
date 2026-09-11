@@ -135,7 +135,7 @@ watch(() => props.grid.length + (props.grid[0]?.length||0), () => {
             class="absolute inset-0"
             :class="[
               cell.terrain === 'grass' ? 'bg-transparent' : '',
-              cell.terrain === 'dirt' ? 'bg-[#8a6d4a]' : '',
+              cell.terrain === 'dirt' ? 'bg-[#8a6d4a] shadow-[inset_0_0_6px_rgba(0,0,0,0.18)]' : '',
               cell.terrain === 'sand' ? 'bg-[#e8dcc0] shadow-[inset_0_0_6px_rgba(0,0,0,0.08)]' : '',
               cell.terrain === 'forest' ? 'bg-[#1e3a1f]' : '',
               cell.terrain === 'water' ? 'bg-[#3b82f6] shadow-[inset_0_1px_4px_rgba(255,255,255,0.25)]' : '',
@@ -144,13 +144,15 @@ watch(() => props.grid.length + (props.grid[0]?.length||0), () => {
               cell.terrain === 'tile' ? 'bg-[#e7e5e4] shadow-[inset_0_0_4px_rgba(0,0,0,0.12)]' : '',
               cell.terrain === 'wood' ? 'bg-[#a16207] shadow-[inset_0_0_4px_rgba(0,0,0,0.2)]' : '',
               cell.terrain === 'marble' ? 'bg-[#f5f5f4] shadow-[inset_0_0_6px_rgba(0,0,0,0.08)]' : '',
-              cell.terrain === 'stone' ? 'bg-[#78716c] shadow-[inset_0_0_4px_rgba(0,0,0,0.2)]' : ''
+              cell.terrain === 'stone' ? 'bg-[#78716c] shadow-[inset_0_0_4px_rgba(0,0,0,0.2)]' : '',
+              cell.terrain === 'rubble' ? 'bg-[#57534e] shadow-[inset_0_0_6px_rgba(0,0,0,0.35)]' : ''
             ]"
           >
             <div v-if="cell.terrain === 'tile'" class="absolute inset-0 opacity-40" style="background-image: linear-gradient(#a8a29e 1px, transparent 1px), linear-gradient(90deg, #a8a29e 1px, transparent 1px); background-size: 12px 12px;"></div>
             <div v-if="cell.terrain === 'wood'" class="absolute inset-0 opacity-30" style="background-image: repeating-linear-gradient(90deg, #78350f 0 2px, transparent 2px 14px), repeating-linear-gradient(#92400e 1px, transparent 1px); background-size: 14px 6px;"></div>
             <div v-if="cell.terrain === 'marble'" class="absolute inset-0 opacity-25" style="background: radial-gradient(ellipse at 20% 30%, #a8a29e 1px, transparent 1px), radial-gradient(ellipse at 70% 60%, #d6d3d1 1px, transparent 1px); background-size: 18px 18px;"></div>
             <div v-if="cell.terrain === 'stone'" class="absolute inset-0 opacity-30" style="background-image: linear-gradient(#57534e 1px, transparent 1px), linear-gradient(90deg, #57534e 1px, transparent 1px); background-size: 10px 10px;"></div>
+            <div v-if="cell.terrain === 'rubble'" class="absolute inset-0 opacity-50" style="background-image: radial-gradient(circle at 30% 30%, #44403c 2px, transparent 2px), radial-gradient(circle at 70% 60%, #292524 1.5px, transparent 1.5px), linear-gradient(45deg, transparent 48%, #1c1917 49%, #1c1917 51%, transparent 52%); background-size: 10px 10px, 14px 14px, 6px 6px;"></div>
             <div v-if="cell.terrain === 'water' || cell.terrain === 'deep_water'" class="absolute inset-0 opacity-30" style="background: radial-gradient(ellipse at 35% 25%, rgba(255,255,255,0.35) 0%, transparent 45%);"></div>
           </div>
 

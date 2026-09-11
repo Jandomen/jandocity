@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { useCityStore } from './cityStore.js'
+import { useAudioManager } from '@/audio/audioManager.js'
 
 const ROAD_IDS = ['road','dirt_road','concrete_road','cobble_road']
 const RAIL_IDS = ['rail']
@@ -22,21 +23,21 @@ export const useTrafficStore = defineStore('traffic', () => {
   const airportPlanes = ref([])
   let vid = 1, pid = 1, tid = 1, aid = 1, apid = 1
 
-  function addVehicle(x, y, type = 'car') {
+  function addVehicle(x, y, type = 'car', owner = null) {
     const city = useCityStore()
     const cell = city.getCell(x, y)
     if (type === 'train') {
       if (!cell || !isRailCell(cell)) return { ok: false, reason: 'Tren solo sobre rieles 🛤️' }
-      trains.value.push({ id: tid++, x, y, dir: 'right', type, speed: 520 })
+      trains.value.push({ id: tid++, x, y, dir: 'right', type, speed: 520, owner })
       return { ok: true }
     }
     if (!cell || !isRoadCell(cell)) return { ok: false, reason: 'Solo sobre carretera' }
-    const speedMap = { moto: 320, trailer: 650, police_car: 400, ambulance: 380, fire_truck: 420, army_jeep: 380, tank: 520 }
-    vehicles.value.push({ id: vid++, x, y, dir: 'right', type, speed: speedMap[type] || 480 })
+    const speedMap = { moto: 320, trailer: 650, police_car: 400, ambulance: 380, fire_truck: 420, army_jeep: 380, tank: 520, tractor: 380, cannon: 480 }
+    vehicles.value.push({ id: vid++, x, y, dir: 'right', type, speed: speedMap[type] || 480, owner, hp: 100, maxHp: 100 })
     return { ok: true }
   }
 
-  function addPedestrian(x, y, kind = 'adult') {
+  function addPedestrian(x, y, kind = 'adult', owner = null) {
     const city = useCityStore()
     const cell = city.getCell(x, y)
     if (!cell || !isRoadCell(cell)) {
@@ -67,7 +68,7 @@ export const useTrafficStore = defineStore('traffic', () => {
     const isArmed = kind === 'criminal' && weapon !== 'unarmed'
     // peatones caminan despacio (1200-1600ms), servicio un poco menos lento, criminal corre si huye (550ms), se ajusta dinámico en tick
     const baseSpeed = isService ? 1150 + Math.random()*250 : kind==='criminal' ? 950 + Math.random()*200 : 1250 + Math.random()*350
-    pedestrians.value.push({ id: pid++, x, y, dir: 'right', kind, weapon, isArmed, attackCooldown: 0, isRunning: false, speed: baseSpeed, baseSpeed, step: 0 })
+    pedestrians.value.push({ id: pid++, x, y, dir: 'right', kind, weapon, isArmed, attackCooldown: 0, isRunning: false, speed: baseSpeed, baseSpeed, step: 0, owner, hp: 100, maxHp: 100, target: null })
     return { ok: true }
   }
 
@@ -186,6 +187,17 @@ export const useTrafficStore = defineStore('traffic', () => {
   }
 
   function tick() {
+    // sirenas ocasionales para patrullas/ambulancias (no saturar)
+    try {
+      const hasPolice = vehicles.value.some(v => v.type === 'police_car' || v.type === 'army_jeep')
+      const hasAmb = vehicles.value.some(v => v.type === 'ambulance')
+      if (hasPolice && Math.random() < 0.06) {
+        try { useAudioManager().effects.playSiren('police') } catch {}
+      }
+      if (hasAmb && Math.random() < 0.05) {
+        try { useAudioManager().effects.playSiren('ambulance') } catch {}
+      }
+    } catch {}
     // aviones: interpolación diagonal suave 0->1 en ~6 ticks (3s)
     for (let i = airportPlanes.value.length - 1; i >= 0; i--) {
       const pl = airportPlanes.value[i]
@@ -222,6 +234,7 @@ export const useTrafficStore = defineStore('traffic', () => {
     accidents.value = accidents.value.filter(a => now - a.t < 45000)
 
     for (const p of polices) {
+      if (p.target) continue // ordenado por jugador, no auto
       // peatones normales caminan despacio
       p.speed = p.baseSpeed || p.speed
       if (criminals.length === 0) {
@@ -260,6 +273,7 @@ export const useTrafficStore = defineStore('traffic', () => {
     }
 
     for (const v of policeCars) {
+      if (v.target) continue
       if (criminals.length === 0) {
         const step = randomStep(v, false)
         if (step) { v.x += step.dx; v.y += step.dy; v.dir = step.dir }
@@ -286,6 +300,7 @@ export const useTrafficStore = defineStore('traffic', () => {
 
     // Criminales: huyen o atacan según arma (knife/gun) — corren al huir/atacar
     for (const c of criminals) {
+      if (c.target) continue
       if (c.attackCooldown > 0) c.attackCooldown--
       const nearestPolice = [...polices, ...policeCars].reduce((b, p) => {
         const d = Math.abs(p.x - c.x) + Math.abs(p.y - c.y)
@@ -303,14 +318,17 @@ export const useTrafficStore = defineStore('traffic', () => {
             victimPolice.injured = true
             victimPolice.speed = 9999
             addAccident(victimPolice.x, victimPolice.y)
+            try { if(c.weapon==='gun') useAudioManager().effects.playGunShot(); else if(c.weapon==='knife') useAudioManager().effects.playKnife(); } catch {}
             c.attackCooldown = isGun ? 6 : 4
           } else {
             // ataca civil cercano o crea accidente en su posición
             const civil = pedestrians.value.find(p => !['police','soldier','criminal','medic','fireman'].includes(p.kind) && !p.injured && Math.abs(p.x - c.x)+Math.abs(p.y - c.y) <= 1)
             if (civil) {
               civil.injured = true; civil.speed = 9999; addAccident(civil.x, civil.y)
+              try { if(c.weapon==='gun') useAudioManager().effects.playGunShot(); else if(c.weapon==='knife') useAudioManager().effects.playKnife(); } catch {}
             } else {
               addAccident(c.x, c.y)
+              try { if(c.weapon==='gun') useAudioManager().effects.playGunShot(); else if(c.weapon==='knife') useAudioManager().effects.playKnife(); } catch {}
             }
             c.attackCooldown = 5
           }
@@ -333,8 +351,8 @@ export const useTrafficStore = defineStore('traffic', () => {
         const civilNear = pedestrians.value.find(p => !['police','soldier','criminal','medic','fireman'].includes(p.kind) && !p.injured && Math.abs(p.x - c.x)+Math.abs(p.y - c.y) <= 1)
         if (civilNear && c.attackCooldown === 0) {
           civilNear.injured = true; civilNear.speed = 9999; addAccident(civilNear.x, civilNear.y)
+          try { if(c.weapon==='gun') useAudioManager().effects.playGunShot(); else if(c.weapon==='knife') useAudioManager().effects.playKnife(); } catch {}
           c.attackCooldown = 6
-          c.isRunning = true; c.speed = 520
           continue
         }
       }
@@ -345,6 +363,7 @@ export const useTrafficStore = defineStore('traffic', () => {
 
     // Ambulancias persiguen accidentes
     for (const v of ambulances) {
+      if (v.target) continue
       if (activeAccidents.length === 0) {
         if (!v.hasPatient) {
           const step = randomStep(v, false)
@@ -407,6 +426,7 @@ export const useTrafficStore = defineStore('traffic', () => {
     // civiles caminan despacio; si ven criminal a ≤3, corren despavoridos
     const handledKinds = new Set(['police','soldier','criminal'])
     for (const p of pedestrians.value) {
+      if (p.target) continue
       if (handledKinds.has(p.kind)) continue
       if (p.injured) continue
       // civil ve criminal cerca → corre
@@ -444,6 +464,7 @@ export const useTrafficStore = defineStore('traffic', () => {
       if (step) { p.x += step.dx; p.y += step.dy; p.dir = step.dir }
     }
     for (const v of vehicles.value) {
+      if (v.target) continue
       if (v.type==='police_car' || v.type==='ambulance' || v.type==='army_jeep' || v.type==='tank') continue
       const step = randomStep(v, false)
       if (step) { v.x += step.dx; v.y += step.dy; v.dir = step.dir }

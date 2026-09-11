@@ -1021,6 +1021,66 @@
       <text x="50" y="66" font-size="5" fill="#22d3ee" text-anchor="middle">💾 DATA</text>
     </svg>
 
+    <svg v-else-if="type === 'bus_terminal'" viewBox="0 0 100 100" class="w-full h-full">
+      <rect x="8" y="32" width="84" height="40" rx="3" fill="#facc15" stroke="#92400e" stroke-width="1.4" />
+      <rect x="6" y="24" width="88" height="12" rx="1.5" fill="#92400e" />
+      <text x="50" y="32" font-size="5" font-weight="900" fill="#fff" text-anchor="middle">TERMINAL BUSES</text>
+      <rect x="14" y="44" width="24" height="16" rx="2" fill="#fff" stroke="#57534e" stroke-width="1" /><text x="26" y="54" font-size="10" text-anchor="middle">🚌</text>
+      <rect x="38" y="44" width="24" height="16" rx="2" fill="#fff" stroke="#57534e" stroke-width="1" /><text x="50" y="54" font-size="10" text-anchor="middle">🚌</text>
+      <rect x="62" y="44" width="24" height="16" rx="2" fill="#e5e7eb" stroke="#57534e" stroke-width="1" /><text x="74" y="54" font-size="8" text-anchor="middle">🚌</text>
+      <rect x="14" y="62" width="72" height="4" rx="1" fill="#57534e" />
+    </svg>
+
+    <svg v-else-if="type === 'car_dealership'" viewBox="0 0 100 100" class="w-full h-full">
+      <rect x="10" y="28" width="80" height="44" rx="3" fill="#e0f2fe" stroke="#0284c7" stroke-width="1.4" />
+      <rect x="8" y="20" width="84" height="12" rx="1.5" fill="#0284c7" />
+      <text x="50" y="28" font-size="5" font-weight="900" fill="#fff" text-anchor="middle">AUTOS 🏎️</text>
+      <rect x="14" y="36" width="80" height="24" rx="1" fill="#fff" stroke="#94a3b8" stroke-width="1" />
+      <text x="30" y="50" font-size="12" text-anchor="middle">🚗</text><text x="50" y="50" font-size="12" text-anchor="middle">🚗</text><text x="70" y="50" font-size="12" text-anchor="middle">🚗</text>
+      <rect x="14" y="62" width="80" height="4" rx="1" fill="#334155" />
+    </svg>
+
+    <svg v-else-if="type === 'moto_dealership'" viewBox="0 0 100 100" class="w-full h-full">
+      <rect x="12" y="30" width="76" height="42" rx="3" fill="#1f2937" stroke="#f59e0b" stroke-width="1.4" />
+      <rect x="10" y="22" width="80" height="12" rx="1.5" fill="#f59e0b" />
+      <text x="50" y="30" font-size="5" font-weight="900" fill="#1f2937" text-anchor="middle">MOTOS 🏍️</text>
+      <rect x="16" y="38" width="72" height="22" rx="1" fill="#27272a" stroke="#52525b" stroke-width="1" />
+      <text x="32" y="52" font-size="12" text-anchor="middle">🏍️</text><text x="50" y="52" font-size="12" text-anchor="middle">🏍️</text><text x="68" y="52" font-size="12" text-anchor="middle">🏍️</text>
+      <circle cx="28" cy="66" r="2" fill="#facc15" /><circle cx="72" cy="66" r="2" fill="#facc15" />
+    </svg>
+
+    <svg v-else-if="type === 'military_academy'" viewBox="0 0 100 100" class="w-full h-full">
+      <rect x="10" y="28" width="80" height="48" rx="2" fill="#365314" stroke="#1a2e05" stroke-width="1.4" />
+      <rect x="8" y="20" width="84" height="12" rx="1" fill="#1a2e05" />
+      <text x="50" y="28" font-size="5" font-weight="900" fill="#a3e635" text-anchor="middle">COLEGIO MILITAR 🪖</text>
+      <g fill="#84cc16" stroke="#365314" stroke-width="0.6">
+        <rect x="18" y="36" width="14" height="14" rx="1" /><rect x="38" y="36" width="14" height="14" rx="1" /><rect x="58" y="36" width="14" height="14" rx="1" />
+      </g>
+      <rect x="42" y="52" width="16" height="16" rx="1" fill="#1a2e05" stroke="#000" stroke-width="0.8" />
+      <text x="50" y="62" font-size="8" text-anchor="middle">🪖</text>
+      <rect x="14" y="68" width="72" height="3" rx="1" fill="#57534e" />
+    </svg>
+
+    <svg v-else-if="type === 'arsenal'" viewBox="0 0 100 100" class="w-full h-full">
+      <defs>
+        <linearGradient id="arsenalRoof" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#44403c" />
+          <stop offset="100%" stop-color="#1c1917" />
+        </linearGradient>
+      </defs>
+      <ellipse cx="50" cy="84" rx="36" ry="6" fill="#000" opacity="0.25" />
+      <rect x="10" y="32" width="80" height="40" rx="2" fill="#57534e" stroke="#1c1917" stroke-width="1.4" />
+      <rect x="8" y="24" width="84" height="12" rx="1" fill="url(#arsenalRoof)" stroke="#1c1917" stroke-width="1" />
+      <text x="50" y="32" font-size="5" font-weight="900" fill="#facc15" text-anchor="middle">ARSENAL 💣</text>
+      <g fill="#a8a29e" stroke="#57534e" stroke-width="0.8">
+        <rect x="16" y="40" width="18" height="10" rx="1" /><rect x="36" y="40" width="14" height="10" rx="1" /><rect x="52" y="40" width="16" height="10" rx="1" />
+      </g>
+      <text x="25" y="47" font-size="7" text-anchor="middle">🚜</text><text x="43" y="47" font-size="6" text-anchor="middle">🔧</text><text x="60" y="47" font-size="8" text-anchor="middle">💣</text>
+      <rect x="18" y="56" width="64" height="8" rx="1" fill="#1c1917" />
+      <text x="50" y="62" font-size="4" fill="#facc15" text-anchor="middle" font-weight="700">TRACTOR → CAÑÓN</text>
+      <circle cx="74" cy="66" r="1.5" fill="#facc15" />
+    </svg>
+
     <svg v-else-if="type === 'sewage_plant'" viewBox="0 0 100 100" class="w-full h-full">
       <ellipse cx="34" cy="52" rx="18" ry="14" fill="#78716c" stroke="#44403c" stroke-width="1.2" />
       <ellipse cx="66" cy="52" rx="18" ry="14" fill="#78716c" stroke="#44403c" stroke-width="1.2" />

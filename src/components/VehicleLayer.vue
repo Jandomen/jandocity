@@ -2,13 +2,17 @@
 import { computed, onMounted, onUnmounted, watch } from 'vue'
 import { useCityStore } from '@/stores/cityStore.js'
 import { useTrafficStore } from '@/stores/trafficStore.js'
+import { useSinglePlayerStore } from '@/stores/singlePlayerStore.js'
+import { useSelection } from '@/composables/useSelection.js'
 import { useAudioManager } from '@/audio/audioManager.js'
 
 const city = useCityStore()
 const traffic = useTrafficStore()
+const single = useSinglePlayerStore()
+const selection = useSelection()
 const audio = useAudioManager()
 
-const vehicleIcons = { car: '🚗', pickup: '🛻', moto: '🏍️', trailer: '🚛', bus: '🚌', police_car: '🚔', ambulance: '🚑', fire_truck: '🚒', army_jeep: '🚙', tank: '🛡️' }
+const vehicleIcons = { car: '🚗', pickup: '🛻', moto: '🏍️', trailer: '🚛', bus: '🚌', police_car: '🚔', ambulance: '🚑', fire_truck: '🚒', army_jeep: '🚙', tank: '🛡️', tractor: '🚜', cannon: '💣' }
 
 function posFor(entity) {
   const ox = city.offsetX ?? city.grid[0]?.[0]?.x ?? 0
@@ -74,12 +78,13 @@ const pedBodies = {
     <div
       v-for="v in traffic.vehicles"
       :key="'v'+v.id"
-      class="absolute w-[22px] h-[22px] -translate-x-1/2 -translate-y-1/2 flex items-center justify-center text-[16px] select-none"
+      class="absolute w-[24px] h-[24px] -translate-x-1/2 -translate-y-1/2 flex items-center justify-center text-[16px] select-none"
       :style="{ left: posFor(v).x + 'px', top: posFor(v).y + 'px', transform: `translate(-50%,-50%) rotate(${rotMap[v.dir]||0}deg)`, transition: `left ${v.speed}ms linear, top ${v.speed}ms linear, transform 180ms` }"
-      :title="v.type"
-      :class="{ 'animate-pulse': v.type==='police_car' || v.type==='ambulance' }"
+      :title="v.type + (v.owner ? ' ['+v.owner+']' : '') + (v.hp ? ' HP:'+v.hp : '')"
+      :class="{ 'animate-pulse': v.type==='police_car' || v.type==='ambulance', 'ring-2 ring-white rounded-full': selection.isSelected('veh', v.id), 'ring-2 ring-yellow-400': single.isActive && v.owner && v.owner !== single.humanPlayer()?.id }"
     >
       <span :class="{ 'drop-shadow-[0_0_4px_rgba(59,130,246,0.8)]': v.type==='police_car', 'drop-shadow-[0_0_4px_rgba(239,68,68,0.8)]': v.type==='ambulance' }">{{ vehicleIcons[v.type] || '🚗' }}</span>
+      <div v-if="v.hp!==undefined && v.hp<100" class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-[16px] h-1 bg-black/40 rounded-full overflow-hidden border border-white/20"><div class="h-full bg-red-500" :style="{width: v.hp+'%'}"></div></div>
     </div>
     <!-- Peatones con cuerpo, pies y manos, caminando lento -->
     <div
@@ -87,8 +92,8 @@ const pedBodies = {
       :key="'p'+p.id"
       class="absolute w-[16px] h-[18px] -translate-x-1/2 -translate-y-1/2 select-none"
       :style="{ left: posFor(p).x + 'px', top: (posFor(p).y+6) + 'px', transition: `left ${p.speed}ms linear, top ${p.speed}ms linear` }"
-      :title="p.kind + (p.injured ? ' (herido)' : '')"
-      :class="{ 'opacity-70': p.injured, 'ring-1 ring-red-500 rounded-full': p.kind==='criminal' }"
+      :title="p.kind + (p.injured ? ' (herido)' : '') + (p.owner ? ' ['+p.owner+']' : '')"
+      :class="{ 'opacity-70': p.injured, 'ring-1 ring-red-500 rounded-full': p.kind==='criminal', 'ring-2 ring-white rounded': selection.isSelected('ped', p.id), 'ring-2 ring-yellow-400': single.isActive && p.owner && p.owner !== single.humanPlayer()?.id && !selection.isSelected('ped', p.id) }"
     >
       <div class="relative w-full h-full flex flex-col items-center" :class="p.injured ? '' : 'ped-walk'">
         <!-- sombra -->
@@ -118,6 +123,7 @@ const pedBodies = {
         </div>
         <div v-if="p.kind==='criminal'" class="absolute -bottom-2 left-1/2 -translate-x-1/2 text-[6px] px-1 rounded-full font-bold flex items-center gap-0.5" :class="p.weapon==='gun' ? 'bg-black text-white border border-red-500' : p.weapon==='knife' ? 'bg-orange-600 text-white' : 'bg-red-600 text-white'">{{ p.weapon==='gun' ? '🔫 FUGITIVO' : p.weapon==='knife' ? '🔪 FUGITIVO' : 'FUGITIVO' }}</div>
         <div v-else-if="p.injured" class="absolute -bottom-2 left-1/2 -translate-x-1/2 text-[6px] bg-amber-500 text-white px-1 rounded-full font-bold">HERIDO</div>
+        <div v-if="p.hp!==undefined && p.hp<100 && !p.injured" class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-[14px] h-1 bg-black/40 rounded-full overflow-hidden border border-white/20"><div class="h-full bg-green-500" :style="{width: p.hp+'%'}"></div></div>
         <div v-else-if="p.kind==='student'" class="absolute -bottom-2 left-1/2 -translate-x-1/2 text-[6px] bg-violet-600 text-white px-1 rounded-full font-bold">ESCOLAR</div>
         <div v-else-if="p.kind==='uni_student'" class="absolute -bottom-2 left-1/2 -translate-x-1/2 text-[6px] bg-indigo-600 text-white px-1 rounded-full font-bold">UNI</div>
         <div v-else-if="p.kind==='lawyer'" class="absolute -bottom-2 left-1/2 -translate-x-1/2 text-[6px] bg-slate-700 text-white px-1 rounded-full font-bold">ABOG</div>

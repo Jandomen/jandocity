@@ -81,38 +81,9 @@ const player = usePlayerStore()
       </div>
     </div>
 
-    <!-- Controles de Tiempo y Persistencia — no wrap -->
-    <div class="flex items-center gap-1.5 shrink-0">
-      <div class="text-[10px] text-slate-400 font-mono mr-1">Tick: #{{ city.tickCount }}</div>
-      <button 
-        @click="city.isPaused ? city.resume() : city.pause()"
-        class="px-2 py-1 rounded text-xs font-semibold transition-colors"
-        :class="city.isPaused ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-amber-600 hover:bg-amber-500 text-white'"
-      >
-        {{ city.isPaused ? '▶' : '⏸' }}
-      </button>
-      <div class="h-4 w-px bg-slate-700 mx-1"></div>
-      <button 
-        @click="city.saveCity()"
-        class="px-2 py-1 rounded text-xs font-medium bg-sky-700 hover:bg-sky-600 text-white transition-colors"
-        title="Guardar partida (localStorage)"
-      >
-        💾
-      </button>
-      <button 
-        @click="city.loadCity()"
-        class="px-2 py-1 rounded text-xs font-medium bg-slate-700 hover:bg-slate-600 text-white transition-colors"
-        title="Cargar partida guardada"
-      >
-        📂
-      </button>
-      <button 
-        @click="city.resetCity()"
-        class="px-2 py-1 rounded text-xs font-medium bg-red-800/80 hover:bg-red-700 text-white transition-colors"
-        title="Reiniciar ciudad y borrar progreso"
-      >
-        🔄
-      </button>
+    <!-- Tick solo — resto en ESC -->
+    <div class="flex items-center gap-1 shrink-0">
+      <div class="text-[10px] text-slate-400 font-mono">Tick: #{{ city.tickCount }}</div>
     </div>
   </header>
 </template>

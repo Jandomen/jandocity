@@ -12,19 +12,32 @@ import CellTile from './CellTile.vue'
 import Player from './Player.vue'
 import { usePlayerStore } from '@/stores/playerStore.js'
 import { useTrafficStore } from '@/stores/trafficStore.js'
+import { useSinglePlayerStore } from '@/stores/singlePlayerStore.js'
+import { useBuildQueue } from '@/composables/useBuildQueue.js'
+import { useUnitQueue } from '@/composables/useUnitQueue.js'
+import { useSelection } from '@/composables/useSelection.js'
+import { BUILDINGS } from '@/constants/buildings.js'
 import VehicleLayer from './VehicleLayer.vue'
 import AirportPlaneLayer from './AirportPlaneLayer.vue'
+import { useAudioManager } from '@/audio/audioManager.js'
 import { watch } from 'vue'
 
 const props = defineProps({
   class: { type: String, default: '' },
   showUi: { type: Boolean, default: true }
 })
-const emit = defineEmits(['toggleUi'])
+const emit = defineEmits(['toggleUi','openChat'])
 
 const city = useCityStore()
 const player = usePlayerStore()
 const traffic = useTrafficStore()
+const single = useSinglePlayerStore()
+const buildQueue = useBuildQueue()
+const unitQueue = useUnitQueue()
+const selection = useSelection()
+const audioMgr = useAudioManager()
+const filteredBuildQueue = computed(() => (buildQueue.queue.value || []).filter(q=>!isNaN(q.progress) && q.progress!==undefined))
+const filteredUnitQueue = computed(() => (unitQueue.queue.value || []).filter(q=>!isNaN(q.progress) && q.progress!==undefined))
 const gridSize = computed(() => city.gridSize || 20)
 const gridWidth = computed(() => city.gridWidth || 20)
 const gridHeight = computed(() => city.gridSize || 20)
@@ -153,8 +166,18 @@ function toggleQuadrant(qx, qy) {
   else activeQuadrant.value = { qx, qy }
 }
 
-onMounted(() => window.addEventListener('keydown', onKeydown))
-onUnmounted(() => window.removeEventListener('keydown', onKeydown))
+let buildTick = null
+let selTick = null
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown)
+  buildTick = setInterval(() => { if (single.isActive) { buildQueue.tick(100); unitQueue.tick(100) } }, 100)
+  selTick = setInterval(() => { if (single.isActive) selection.tick() }, 420)
+})
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKeydown)
+  if (buildTick) clearInterval(buildTick)
+  if (selTick) clearInterval(selTick)
+})
 
 const terrainToolMap = { lake: 'water', deep_lake: 'deep_water', sand_brush: 'sand', forest_brush: 'forest', grass_brush: 'grass', concrete_brush: 'concrete', tile_brush: 'tile', wood_brush: 'wood', marble_brush: 'marble', stone_brush: 'stone' }
 const VEHICLE_TYPES = ['car','pickup','moto','trailer','bus','train']
@@ -203,7 +226,45 @@ function getValidation(cell) {
 
 function handleCellClick(cell) {
   if (wasDragging) return
-  if (!city.selectedTool) return
+  // Un jugador: selección y órdenes
+  if (single.isActive) {
+    const humanId = single.humanPlayer()?.id || 'p0'
+    const pedAt = traffic.pedestrians.find(p => p.x === cell.x && p.y === cell.y)
+    const vehAt = traffic.vehicles.find(v => v.x === cell.x && v.y === cell.y)
+    const ownPed = pedAt && pedAt.owner === humanId
+    const ownVeh = vehAt && vehAt.owner === humanId
+    if (ownPed) { selection.selectPed(pedAt.id, false); showAviso(`Seleccionado ${pedAt.kind} HP:${pedAt.hp||100}`); return }
+    if (ownVeh) { selection.selectVeh(vehAt.id, false); showAviso(`Seleccionado ${vehAt.type} HP:${vehAt.hp||100}`); return }
+    if (selection.selected.value.length > 0) {
+      // click en objetivo enemigo o suelo
+      let targetInfo = null
+      if (pedAt && pedAt.owner !== humanId) targetInfo = { type: 'ped', id: pedAt.id, isEnemy: true }
+      else if (vehAt && vehAt.owner !== humanId) targetInfo = { type: 'veh', id: vehAt.id, isEnemy: true }
+      else {
+        let origin = cell
+        if (cell.isChild && cell.occupiedBy) origin = city.getCell(cell.occupiedBy.x, cell.occupiedBy.y) || cell
+        if (origin && origin.buildingId) {
+          // si tiene owner enemigo o es edificio enemigo (en single todo lo no tuyo es enemigo)
+          const isEnemy = !origin.owner || origin.owner !== humanId
+          if (isEnemy) targetInfo = { type: 'building', id: origin.id, isEnemy: true, buildingId: origin.buildingId }
+        }
+      }
+      // si hay objetivo enemigo o suelo, ordena
+      if (targetInfo || (!pedAt && !vehAt)) {
+        selection.commandTo(cell.x, cell.y, targetInfo)
+        showAviso(targetInfo ? `⚔️ Atacando ${targetInfo.type}` : `🏃 Moviendo a (${cell.x},${cell.y})`)
+        return
+      }
+    }
+    // si no hay selección y no se seleccionó unidad propia, sigue a construcción si hay herramienta
+    if (!city.selectedTool) {
+      // click vacío sin selección limpia selección
+      if (selection.selected.value.length) selection.clear()
+      return
+    }
+  } else {
+    if (!city.selectedTool) return
+  }
   if (city.selectedTool === 'demolish') {
     const res = city.demolish(cell.x, cell.y)
     if (!res.ok && res.reason) showAviso(res.reason)
@@ -228,6 +289,26 @@ function handleCellClick(cell) {
     const res = city.paintTerrain(cell.x, cell.y, t, cost)
     if (!res.ok && res.reason) showAviso(`${res.reason} en (${cell.x},${cell.y})`)
     return
+  }
+  // Un jugador: construcción con tiempo 0-100%
+  if (single.isActive) {
+    let effectiveTool = city.selectedTool
+    if (effectiveTool === 'residential' && city.selectedHouseVariant !== 'residential') effectiveTool = city.selectedHouseVariant
+    const dur = buildQueue.durationFor(effectiveTool)
+    if (dur === 0) {
+      const res = city.placeBuildingAt(cell.x, cell.y, effectiveTool, single.humanPlayer()?.id || 'p0')
+      if (!res.ok && res.reason) showAviso(`${res.reason} en (${cell.x},${cell.y})`)
+      else single.hasEverBuilt = true
+      return
+    } else {
+      if (buildQueue.findAt(cell.x, cell.y)) { showAviso('Ya en construcción en ('+cell.x+','+cell.y+')'); return }
+      const validation = canPlaceAt(city.grid, cell.x, cell.y, effectiveTool, city.money)
+      if (!validation.ok) { showAviso(`${validation.reason} en (${cell.x},${cell.y})`); return }
+      const added = buildQueue.add(cell.x, cell.y, effectiveTool, single.humanPlayer()?.id || 'p0')
+      if (!added) { showAviso('Fondos insuficientes o ya en cola'); return }
+      showAviso(`En construcción ${BUILDINGS[effectiveTool]?.label || effectiveTool} ${Math.round(added.progress)}%`)
+      return
+    }
   }
   const res = city.placeBuilding(cell.x, cell.y)
   if (!res.ok && res.reason) showAviso(`${res.reason} en (${cell.x},${cell.y})`)
@@ -257,6 +338,22 @@ function handleCellEnter(cell) {
     const res = city.paintTerrain(cell.x, cell.y, t, cost)
     if (!res.ok && res.reason && !res.reason.startsWith('Ya es')) showAviso(res.reason)
     return
+  }
+  if (single.isActive) {
+    let effectiveTool = city.selectedTool
+    if (effectiveTool === 'residential' && city.selectedHouseVariant !== 'residential') effectiveTool = city.selectedHouseVariant
+    const dur = buildQueue.durationFor(effectiveTool)
+    if (dur === 0) {
+      const res = city.placeBuildingAt(cell.x, cell.y, effectiveTool, single.humanPlayer()?.id || 'p0')
+      if (!res.ok && res.reason) console.warn(`[Jandocity] ${res.reason} en (${cell.x},${cell.y})`)
+      return
+    } else {
+      if (buildQueue.findAt(cell.x, cell.y)) return
+      const validation = canPlaceAt(city.grid, cell.x, cell.y, effectiveTool, city.money)
+      if (!validation.ok) return
+      buildQueue.add(cell.x, cell.y, effectiveTool, single.humanPlayer()?.id || 'p0')
+      return
+    }
   }
   const res = city.placeBuilding(cell.x, cell.y)
   if (!res.ok && res.reason) {
@@ -315,6 +412,53 @@ function handleCellEnter(cell) {
         </template>
       </div>
 
+      <!-- Cola construcción Un Jugador 0-100% — solo barra, sin azul -->
+      <div v-if="single.isActive" class="absolute inset-0 pointer-events-none">
+        <div
+          v-for="q in filteredBuildQueue"
+          :key="'bq'+q.id"
+          class="absolute flex flex-col items-center justify-center border-2 border-dashed rounded overflow-hidden bg-black/20 backdrop-blur-[1px]"
+          :style="{
+            left: (q.x - city.offsetX) * 48 + 'px',
+            top: (q.y - city.offsetY) * 48 + 'px',
+            width: q.w * 48 + 'px',
+            height: q.h * 48 + 'px',
+            borderColor: '#6b7280'
+          }"
+        >
+          <div class="absolute inset-0 flex items-center justify-center opacity-40">
+            <span class="text-[18px]">{{ BUILDINGS[q.buildingId]?.icon || '🏗️' }}</span>
+          </div>
+          <div class="relative z-10 flex flex-col items-center gap-0.5 bg-black/70 backdrop-blur px-2 py-1 rounded-full border border-white/20 shadow">
+            <span class="text-[11px] font-black text-white leading-none">{{ Math.round(q.progress || 0) }}%</span>
+            <span class="text-[7px] font-bold text-white/70 leading-none">{{ BUILDINGS[q.buildingId]?.label || q.buildingId }}</span>
+          </div>
+          <div class="absolute bottom-1 left-1 right-1 h-2 bg-black/60 rounded-full overflow-hidden border border-white/20">
+            <div class="h-full bg-white transition-all duration-100" :style="{ width: (q.progress || 0) + '%' }"></div>
+          </div>
+        </div>
+      </div>
+      <!-- Cola unidades (policía/soldado/tanque) -->
+      <div v-if="single.isActive" class="absolute inset-0 pointer-events-none">
+        <div
+          v-for="q in filteredUnitQueue"
+          :key="'uq'+q.id"
+          class="absolute flex flex-col items-center justify-center rounded border border-white/20 bg-black/50 backdrop-blur"
+          :style="{
+            left: (q.bx - city.offsetX) * 48 + 'px',
+            top: (q.by - city.offsetY) * 48 - 14 + 'px',
+            width: (BUILDINGS[q.buildingId]?.width || 2) * 48 + 'px',
+            height: '14px'
+          }"
+        >
+          <div class="w-full h-full flex items-center gap-1 px-1">
+            <span class="text-[8px] leading-none">{{ q.unitType==='police' ? '👮' : q.unitType==='police_car' ? '🚔' : q.unitType==='soldier' ? '🪖' : q.unitType==='soldier_heavy' ? '🎖️' : q.unitType==='army_jeep' ? '🚙' : q.unitType==='tank' ? '🛡️' : q.unitType==='tractor' ? '🚜' : '💣' }}</span>
+            <div class="flex-1 h-1 bg-black/40 rounded-full overflow-hidden border border-white/10"><div class="h-full bg-amber-400" :style="{width: q.progress+'%'}"></div></div>
+            <span class="text-[7px] font-mono text-white">{{ Math.round(q.progress) }}%</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Overlay cuadrantes 10×10 — M para activar/desactivar -->
       <div v-if="showQuadrants" class="absolute inset-0 pointer-events-none">
         <div
@@ -345,7 +489,7 @@ function handleCellEnter(cell) {
       <span>🖱️ Izq pinta • Der demuele • Central arrastra • Rueda zoom • WASD</span>
       <span class="opacity-40">|</span>
       <span class="font-mono">{{ Math.round(camera.scale.value * 100) }}%</span>
-      <button @click="() => { const ox = city.offsetX ?? city.grid[0]?.[0]?.x ?? 0; const oy = city.offsetY ?? city.grid[0]?.[0]?.y ?? 0; const lx = (player.x - ox)*48+24; const ly = (player.y - oy)*48+24; camera.x.value = window.innerWidth/2 - lx*camera.scale.value; camera.y.value = window.innerHeight/2 - ly*camera.scale.value }" class="ml-1 px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-[11px]">⟲ Centrar</button>
+      <button @click="() => { camera.scale.value = 1; const ox = city.offsetX ?? city.grid[0]?.[0]?.x ?? 0; const oy = city.offsetY ?? city.grid[0]?.[0]?.y ?? 0; const lx = (player.x - ox)*48+24; const ly = (player.y - oy)*48+24; camera.x.value = window.innerWidth/2 - lx*camera.scale.value; camera.y.value = window.innerHeight/2 - ly*camera.scale.value }" class="ml-1 px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-[11px]">⌖ Centrar 100%</button>
       <span class="opacity-40">|</span>
       <span class="flex items-center gap-1 text-emerald-300 font-semibold">
         <span class="bg-emerald-600 text-white px-1.5 py-0.5 rounded text-[10px] font-black">I</span>
@@ -355,9 +499,10 @@ function handleCellEnter(cell) {
     </Transition>
     <!-- Botones flotantes transparentes solo móvil/APK — izquierda (joystick va a la derecha) -->
     <div class="md:hidden absolute bottom-4 left-4 z-30 flex flex-col gap-2 pointer-events-auto">
-      <button @click="() => { const ox = city.offsetX ?? city.grid[0]?.[0]?.x ?? 0; const oy = city.offsetY ?? city.grid[0]?.[0]?.y ?? 0; const lx = (player.x - ox)*48+24; const ly = (player.y - oy)*48+24; camera.x.value = window.innerWidth/2 - lx*camera.scale.value; camera.y.value = window.innerHeight/2 - ly*camera.scale.value }" class="w-10 h-10 rounded-full bg-black/30 backdrop-blur border border-white/20 text-white flex items-center justify-center">⟲</button>
-      <button @click="emit('toggleUi')" class="w-10 h-10 rounded-full bg-black/30 backdrop-blur border border-white/20 text-white text-lg font-bold" :class="props.showUi ? 'bg-black/30' : 'bg-emerald-600/50 border-emerald-400/50'" title="Ocultar/mostrar menú">?</button>
-      <button @click="city.selectedTool = city.selectedTool==='fill' ? null : 'fill'" class="w-10 h-10 rounded-full backdrop-blur border text-white text-lg flex items-center justify-center" :class="city.selectedTool==='fill' ? 'bg-amber-600/60 border-amber-400/50 ring-1 ring-amber-400' : 'bg-black/30 border-white/20'" title="Retirar / Rellenar agua">−</button>
+      <button @click="() => { audioMgr.init(); const next = audioMgr.music.next(); city.logs.unshift(`[Audio] ▶ ${audioMgr.music.tracks[next].label} (${audioMgr.music.tracks[next].mood})`); if(city.logs.length>50) city.logs.pop() }" class="w-10 h-10 rounded-full bg-black/30 backdrop-blur border border-white/20 text-white flex items-center justify-center text-[14px]" title="Cambiar música">🎵</button>
+      <button @click="() => { camera.scale.value = 1; const ox = city.offsetX ?? city.grid[0]?.[0]?.x ?? 0; const oy = city.offsetY ?? city.grid[0]?.[0]?.y ?? 0; const lx = (player.x - ox)*48+24; const ly = (player.y - oy)*48+24; camera.x.value = window.innerWidth/2 - lx*camera.scale.value; camera.y.value = window.innerHeight/2 - ly*camera.scale.value }" class="w-10 h-10 rounded-full bg-black/30 backdrop-blur border border-white/20 text-white flex items-center justify-center text-[14px]" title="Centrar 100%">⌖</button>
+      <button @click="emit('openChat')" class="w-10 h-10 rounded-full bg-sky-600/50 backdrop-blur border border-white/20 text-white flex items-center justify-center text-[14px]" title="Chat (T)">💬</button>
+      <button @click="emit('toggleUi')" class="w-10 h-10 rounded-full bg-black/30 backdrop-blur border border-white/20 text-white flex items-center justify-center text-[16px]" :class="props.showUi ? 'bg-black/30' : 'bg-emerald-600/50 border-emerald-400/50'" :title="props.showUi ? 'Ocultar menú' : 'Mostrar menú'">{{ props.showUi ? '🙈' : '👁️' }}</button>
       <button @click="city.selectedTool = city.selectedTool==='demolish' ? null : 'demolish'" class="w-10 h-10 rounded-full backdrop-blur border text-white flex items-center justify-center" :class="city.selectedTool==='demolish' ? 'bg-red-600/60 border-red-400/50 ring-1 ring-red-400' : 'bg-red-600/40 border-white/20'" title="Demoler (mantén pulsado para borrar)">🧨</button>
     </div>
   </main>

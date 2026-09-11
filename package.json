@@ -12,6 +12,7 @@
     "@capacitor/android": "^8.5.1",
     "@capacitor/cli": "^8.5.1",
     "@capacitor/core": "^8.5.1",
+    "@supabase/supabase-js": "^2.116.0",
     "pinia": "^2.2.4",
     "simplex-noise": "^4.0.3",
     "vue": "^3.4.38"

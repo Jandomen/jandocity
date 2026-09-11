@@ -11,7 +11,7 @@ const props = defineProps({
 const width = computed(() => props.grid[0]?.length || 0)
 const height = computed(() => props.grid.length)
 
-const hdTypes = new Set(['residential','residential_small','residential_medium','residential_large','commercial','shop','supermarket','mall','bank','power','waterPlant','water','road','tree','oak','pine','palm','ceiba','dock','pier','fishing_hut','stadium','airport','hotel','hotel_large','restaurant','restaurant_small','university','school','tower_residential','tower_commercial','apartment_block','skyscraper','park','police_station','fire_station','hospital','gym','courthouse','prison','church','cathedral','castle','monument','obelisk','arch','memorial','fountain','lighthouse','dam','wind_turbine','eiffel','liberty','big_ben','christ_rio','colosseum','taj_mahal','great_wall','pyramid','chichen','monserrate','machu','obelisco_ar','torii','palace_kr','wat_thai','table_za','hassan_ma','gate_de','sagrada_es','parthenon_gr','flag_mx','flag_co','flag_br','flag_us','flag_fr','flag_de','flag_es','flag_it','flag_jp','flag_kr','flag_gb','flag_peru','flag_ar','flag_cl','flag_ve','city_hall','museum','port','solar_farm','financial_district','opera','olympic_stadium','nuclear_plant','intl_airport','factory','warehouse','telecom_tower','data_center','sewage_plant','recycling_plant','library','convention_center'])
+const hdTypes = new Set(['residential','residential_small','residential_medium','residential_large','commercial','shop','supermarket','mall','bank','power','waterPlant','water','road','tree','oak','pine','palm','ceiba','dock','pier','fishing_hut','stadium','airport','hotel','hotel_large','restaurant','restaurant_small','university','school','tower_residential','tower_commercial','apartment_block','skyscraper','park','police_station','fire_station','hospital','gym','courthouse','prison','military_academy','arsenal','church','cathedral','castle','monument','obelisk','arch','memorial','fountain','lighthouse','dam','wind_turbine','eiffel','liberty','big_ben','christ_rio','colosseum','taj_mahal','great_wall','pyramid','chichen','monserrate','machu','obelisco_ar','torii','palace_kr','wat_thai','table_za','hassan_ma','gate_de','sagrada_es','parthenon_gr','flag_mx','flag_co','flag_br','flag_us','flag_fr','flag_de','flag_es','flag_it','flag_jp','flag_kr','flag_gb','flag_peru','flag_ar','flag_cl','flag_ve','city_hall','museum','port','solar_farm','financial_district','opera','olympic_stadium','nuclear_plant','intl_airport','factory','warehouse','telecom_tower','data_center','sewage_plant','recycling_plant','library','convention_center','bus_terminal','car_dealership','moto_dealership'])
 const buildingVisuals = {}
 
 function isVegetation(id) { return ['bush','flower','rock'].includes(id) }
@@ -39,6 +39,12 @@ function isHD(id) { return hdTypes.has(id) }
             style="background: #9ca3af; background-image: radial-gradient(circle, rgba(255,255,255,0.18) 1px, transparent 1px); background-size: 6px 6px; border: 1px solid #6b7280; box-shadow: inset 0 1px 2px rgba(255,255,255,0.25), inset 0 -1px 3px rgba(0,0,0,0.15);"
           ></div>
           <div class="relative w-full h-full flex flex-col items-center justify-end p-[2px]">
+            <!-- HP barra si atacado -->
+            <div v-if="cell.hp!==undefined && cell.hp<100" class="absolute -top-1 left-0 right-0 h-1 bg-black/40 rounded-full overflow-hidden border border-white/20 z-10">
+              <div class="h-full bg-red-500" :style="{width: cell.hp+'%'}"></div>
+            </div>
+            <!-- borde color dueño en single -->
+            <div v-if="cell.owner" class="absolute inset-0 rounded-sm pointer-events-none" :style="{border: '2px solid ' + (cell.owner==='p0' ? '#2563eb' : cell.owner==='p1' ? '#dc2626' : cell.owner==='p2' ? '#16a34a' : '#eab308'), opacity: 0.6}"></div>
             <template v-if="isHD(cell.buildingId)">
               <BuildingSprites :type="cell.buildingId" />
             </template>
