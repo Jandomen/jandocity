@@ -9,7 +9,9 @@ let currentOscs = []
 let isMuted = false
 let intervalId = null
 let bassOsc = null
-const isLowEnd = typeof navigator !== 'undefined' && ((navigator.deviceMemory || 4) <= 2 || (navigator.hardwareConcurrency || 4) <= 2 || !!navigator.connection?.saveData)
+const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '')
+const isLowEnd = typeof navigator !== 'undefined' && (isAndroid ? ((navigator.deviceMemory || 4) <= 4 || (navigator.hardwareConcurrency || 4) <= 4) : ((navigator.deviceMemory || 4) <= 2 || (navigator.hardwareConcurrency || 4) <= 2)) || !!navigator.connection?.saveData
+const isAndroidLow = isAndroid && isLowEnd
 
 function getContext() {
   if (!audioCtx) {
@@ -142,28 +144,31 @@ function playChiptune(track, fromAuto = false) {
     gainNode.gain.linearRampToValueAtTime(isMuted ? 0 : 0.34, ctx.currentTime + 1.2)
   }
   scheduleAutoNext()
-  const tick = isLowEnd ? 60000 / track.bpm / 1.5 : 60000 / track.bpm / 2 // más lento en móvil para menos carga
+  const tick = isAndroidLow ? 60000 / track.bpm / 1 : isLowEnd ? 60000 / track.bpm / 1.5 : 60000 / track.bpm / 2
   let step = 0
 
-  // Bajo continuo 8-bit — simplificado en móvil
-  bassOsc = ctx.createOscillator()
-  const bassGain = ctx.createGain()
-  bassOsc.type = 'square'
-  bassGain.gain.value = isLowEnd ? 0.09 : 0.13
-  if (isLowEnd) {
-    bassOsc.connect(bassGain); bassGain.connect(gainNode)
-  } else {
-    const bassFilter = ctx.createBiquadFilter()
-    bassFilter.type = 'lowpass'
-    bassFilter.frequency.value = 650
-    bassOsc.connect(bassGain); bassGain.connect(bassFilter); bassFilter.connect(gainNode)
-    currentOscs.push(bassFilter)
+  // Bajo continuo 8-bit — omitido en Android low para no trabar
+  if (!isAndroidLow) {
+    bassOsc = ctx.createOscillator()
+    const bassGain = ctx.createGain()
+    bassOsc.type = 'square'
+    bassGain.gain.value = isLowEnd ? 0.09 : 0.13
+    if (isLowEnd) {
+      bassOsc.connect(bassGain); bassGain.connect(gainNode)
+    } else {
+      const bassFilter = ctx.createBiquadFilter()
+      bassFilter.type = 'lowpass'
+      bassFilter.frequency.value = 650
+      bassOsc.connect(bassGain); bassGain.connect(bassFilter); bassFilter.connect(gainNode)
+      currentOscs.push(bassFilter)
+    }
+    bassOsc.start()
+    currentOscs.push(bassOsc, bassGain)
   }
-  bassOsc.start()
-  currentOscs.push(bassOsc, bassGain)
 
   let bassStep = 0
   intervalId = setInterval(() => {
+    if (isAndroidLow && step % 2 === 1) { step++; return }
     const semi = track.melody[step % track.melody.length]
     const freq = track.base * Math.pow(2, semi/12)
     const osc = ctx.createOscillator()
@@ -186,7 +191,7 @@ function playChiptune(track, fromAuto = false) {
     }
     osc.start(); osc.stop(ctx.currentTime + tick/1000)
     currentOscs.push(osc, gain)
-    if (currentOscs.length > (isLowEnd ? 14 : 24)) currentOscs.splice(0,3)
+    if (currentOscs.length > (isAndroidLow ? 8 : isLowEnd ? 14 : 24)) currentOscs.splice(0,3)
 
     // ritmo por pista: techno/house → four-on-floor, calma → sparse, tensión → doble hi-hat
     // En móvil low-end se omite hi-hat/kick para no saturar CPU
@@ -217,8 +222,8 @@ function playChiptune(track, fromAuto = false) {
       }
     }
 
-    // Bajo cambia cada 2 pasos (blanca) con variación
-    if (step % 2 === 0) {
+    // Bajo cambia cada 2 pasos (blanca) con variación — omitido en Android low
+    if (!isAndroidLow && step % 2 === 0) {
       const bSemi = track.bass[bassStep % track.bass.length]
       const bFreq = (track.base * 0.5) * Math.pow(2, bSemi/12)
       bassOsc.frequency.linearRampToValueAtTime(bFreq, ctx.currentTime + 0.04)

@@ -79,8 +79,8 @@ const nowTick = ref(Date.now())
 setInterval(() => nowTick.value = Date.now(), 400)
 const recentChats = computed(() => {
   const now = nowTick.value
-  // 4 renglones máx, 3s en pantalla luego se desvanecen, a la derecha 100px en móvil
-  return chatMessages.value.filter(m => now - (m.at || 0) < 3000).slice(-4)
+  // 7s en pantalla, si hay más de 4 se ven 4 con scroll
+  return chatMessages.value.filter(m => now - (m.at || 0) < 7000).slice(-10)
 })
 const trackToast = ref(null)
 let trackToastTimer = null
@@ -450,6 +450,8 @@ onMounted(async () => {
 
   const tryAutoPlay = () => {
     try {
+      const isAndroidLow = /Android/i.test(navigator.userAgent || '') && ((navigator.deviceMemory || 4) <= 4 || (navigator.hardwareConcurrency || 4) <= 4)
+      if (isAndroidLow) { audioMgr.init(); return }
       audioMgr.init()
       if (!audioMgr.music.currentTrack || audioMgr.music.currentTrack === 'calma') {
         audioMgr.music.play('calma')
@@ -526,7 +528,7 @@ onUnmounted(() => {
 
       <!-- Chat overlay — T web / 💬 móvil, listo para multijugador -->
       <ChatBox :show="showChat" :messages="chatMessages" @send="sendChat" @close="showChat=false" />
-      <TransitionGroup name="chat-toast" tag="div" class="absolute bottom-20 left-[100px] md:left-3 z-20 pointer-events-none flex flex-col gap-1 max-w-[220px] md:max-w-[280px]">
+      <TransitionGroup name="chat-toast" tag="div" class="absolute bottom-20 left-[100px] md:left-3 z-20 pointer-events-auto flex flex-col gap-1 max-w-[220px] md:max-w-[280px] max-h-[96px] overflow-y-auto scrollbar-thin pr-1">
         <div v-for="m in recentChats" :key="'toast-'+m.id" v-show="!showChat && appState==='playing'" class="bg-black/70 backdrop-blur px-3 py-1.5 rounded-full border border-white/15 text-xs flex items-center gap-2 shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
           <span class="font-bold text-emerald-300">{{ m.sender }}:</span><span class="text-white/90 truncate">{{ m.text }}</span>
         </div>

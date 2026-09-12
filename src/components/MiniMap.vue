@@ -156,7 +156,7 @@ watch(() => pendingWeapon.value, draw)
         <span>Selecciona en el mapa dónde caerá el ataque. El suelo quedará <b class="text-white">gris con escombros</b> hasta que vuelva el pasto (12s → tierra, 37s → pasto).</span>
       </div>
       <div class="flex-1 overflow-auto p-3 flex items-center justify-center bg-[#0f172a]">
-        <canvas ref="canvasRef" @click="handleCanvasClick" @mousemove="handleCanvasMove" @mouseleave="hoverPos=null; draw()" class="max-w-full max-h-[60vh] w-auto h-auto border border-white/10 rounded shadow" :class="isTargeting ? 'cursor-crosshair ring-2 ring-red-500' : 'cursor-default'" style="image-rendering: pixelated; width: 320px; height: 320px;"></canvas>
+        <canvas ref="canvasRef" @click="handleCanvasClick" @mousemove="handleCanvasMove" @mouseleave="hoverPos=null; draw()" class="max-w-[90vw] max-h-[75vh] md:max-w-full md:max-h-[60vh] w-auto h-auto border border-white/10 rounded shadow" :class="isTargeting ? 'cursor-crosshair ring-2 ring-red-500' : 'cursor-default'" style="image-rendering: pixelated; width: min(85vw, 400px); height: min(85vw, 400px);"></canvas>
       </div>
       <div class="shrink-0 p-3 border-t border-white/10 bg-slate-800/40 flex flex-col gap-2">
         <div v-if="hoverPos && isTargeting" class="text-center text-[11px] font-mono text-white/70">

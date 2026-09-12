@@ -8,9 +8,10 @@ import { ref, computed } from 'vue'
 export function useCamera() {
   const x = ref(0)
   const y = ref(0)
-  const scale = ref(1)
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+  const scale = ref(isMobile ? 0.78 : 1)
 
-  const MIN_SCALE = 0.6
+  const MIN_SCALE = isMobile ? 0.45 : 0.6
   const MAX_SCALE = 2.2
 
   let isDragging = false
