@@ -22,6 +22,8 @@ import AirportPlaneLayer from './AirportPlaneLayer.vue'
 import MultiplayerPlayersLayer from './MultiplayerPlayersLayer.vue'
 import { useAudioManager } from '@/audio/audioManager.js'
 import { usePerformance } from '@/composables/usePerformance.js'
+import { useMultiplayerSync } from '@/composables/useMultiplayerSync.js'
+import { supabase } from '@/lib/supabase.js'
 import { watch } from 'vue'
 
 const props = defineProps({
@@ -39,6 +41,8 @@ const unitQueue = useUnitQueue()
 const selection = useSelection()
 const audioMgr = useAudioManager()
 const perf = usePerformance()
+const multiSync = useMultiplayerSync()
+const isMulti = computed(() => { try { return !!multiSync.isActive?.() } catch { return false } })
 const filteredBuildQueue = computed(() => (buildQueue.queue.value || []).filter(q=>!isNaN(q.progress) && q.progress!==undefined))
 const filteredUnitQueue = computed(() => (unitQueue.queue.value || []).filter(q=>!isNaN(q.progress) && q.progress!==undefined))
 const gridSize = computed(() => city.gridSize || 20)
@@ -176,8 +180,8 @@ function startTicks() {
   if (selTick) clearInterval(selTick)
   const bMs = perf.preset.value.buildTickMs ?? 100
   const sMs = perf.preset.value.selectionTickMs ?? 420
-  buildTick = setInterval(() => { if (single.isActive) { buildQueue.tick(bMs); unitQueue.tick(bMs) } }, bMs)
-  selTick = setInterval(() => { if (single.isActive) selection.tick() }, sMs)
+  buildTick = setInterval(() => { if (single.isActive || isMulti.value) { buildQueue.tick(bMs); unitQueue.tick(bMs) } }, bMs)
+  selTick = setInterval(() => { if (single.isActive || isMulti.value) selection.tick() }, sMs)
 }
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
@@ -239,11 +243,17 @@ function getValidation(cell) {
   return canPlaceAt(city.grid, cell.x, cell.y, city.selectedTool, city.money)
 }
 
-function handleCellClick(cell) {
+async function handleCellClick(cell) {
   if (wasDragging) return
-  // Un jugador: selección y órdenes
-  if (single.isActive) {
-    const humanId = single.humanPlayer()?.id || 'p0'
+  // Selección y órdenes (single y multi)
+  const isMultiActive = isMulti.value
+  const activeSelect = single.isActive || isMultiActive
+  if (activeSelect) {
+    let humanId = 'p0'
+    if (single.isActive) humanId = single.humanPlayer()?.id || 'p0'
+    else if (isMultiActive) {
+      try { const { data: { user } } = await supabase.auth.getUser(); if (user) humanId = user.id } catch {}
+    }
     const pedAt = traffic.pedestrians.find(p => p.x === cell.x && p.y === cell.y)
     const vehAt = traffic.vehicles.find(v => v.x === cell.x && v.y === cell.y)
     const ownPed = pedAt && pedAt.owner === humanId
@@ -251,7 +261,6 @@ function handleCellClick(cell) {
     if (ownPed) { selection.selectPed(pedAt.id, false); showAviso(`Seleccionado ${pedAt.kind} HP:${pedAt.hp||100}`); return }
     if (ownVeh) { selection.selectVeh(vehAt.id, false); showAviso(`Seleccionado ${vehAt.type} HP:${vehAt.hp||100}`); return }
     if (selection.selected.value.length > 0) {
-      // click en objetivo enemigo o suelo
       let targetInfo = null
       if (pedAt && pedAt.owner !== humanId) targetInfo = { type: 'ped', id: pedAt.id, isEnemy: true }
       else if (vehAt && vehAt.owner !== humanId) targetInfo = { type: 'veh', id: vehAt.id, isEnemy: true }
@@ -259,21 +268,17 @@ function handleCellClick(cell) {
         let origin = cell
         if (cell.isChild && cell.occupiedBy) origin = city.getCell(cell.occupiedBy.x, cell.occupiedBy.y) || cell
         if (origin && origin.buildingId) {
-          // si tiene owner enemigo o es edificio enemigo (en single todo lo no tuyo es enemigo)
           const isEnemy = !origin.owner || origin.owner !== humanId
           if (isEnemy) targetInfo = { type: 'building', id: origin.id, isEnemy: true, buildingId: origin.buildingId }
         }
       }
-      // si hay objetivo enemigo o suelo, ordena
       if (targetInfo || (!pedAt && !vehAt)) {
         selection.commandTo(cell.x, cell.y, targetInfo)
         showAviso(targetInfo ? `⚔️ Atacando ${targetInfo.type}` : `🏃 Moviendo a (${cell.x},${cell.y})`)
         return
       }
     }
-    // si no hay selección y no se seleccionó unidad propia, sigue a construcción si hay herramienta
     if (!city.selectedTool) {
-      // click vacío sin selección limpia selección
       if (selection.selected.value.length) selection.clear()
       return
     }
@@ -307,23 +312,27 @@ function handleCellClick(cell) {
     return
   }
   // Un jugador: construcción con tiempo 0-100%
-  if (single.isActive) {
+  if (single.isActive || isMulti.value) {
     let effectiveTool = city.selectedTool
     if (effectiveTool === 'residential' && city.selectedHouseVariant !== 'residential') effectiveTool = city.selectedHouseVariant
     const dur = buildQueue.durationFor(effectiveTool)
+    let ownerId = 'p0'
+    if (single.isActive) ownerId = single.humanPlayer()?.id || 'p0'
+    else {
+      try { const { data: { user } } = await supabase.auth.getUser(); if (user) ownerId = user.id } catch {}
+    }
     if (dur === 0) {
-      const res = city.placeBuildingAt(cell.x, cell.y, effectiveTool, single.humanPlayer()?.id || 'p0')
+      const res = city.placeBuildingAt(cell.x, cell.y, effectiveTool, ownerId)
       if (!res.ok && res.reason) showAviso(`${res.reason} en (${cell.x},${cell.y})`)
-      else { single.hasEverBuilt = true; broadcastIfMulti(cell.x, cell.y, effectiveTool) }
+      else { if (single.isActive) single.hasEverBuilt = true; broadcastIfMulti(cell.x, cell.y, effectiveTool) }
       return
     } else {
       if (buildQueue.findAt(cell.x, cell.y)) { showAviso('Ya en construcción en ('+cell.x+','+cell.y+')'); return }
       const validation = canPlaceAt(city.grid, cell.x, cell.y, effectiveTool, city.money)
       if (!validation.ok) { showAviso(`${validation.reason} en (${cell.x},${cell.y})`); return }
-      const added = buildQueue.add(cell.x, cell.y, effectiveTool, single.humanPlayer()?.id || 'p0')
+      const added = buildQueue.add(cell.x, cell.y, effectiveTool, ownerId)
       if (!added) { showAviso('Fondos insuficientes o ya en cola'); return }
       showAviso(`En construcción ${BUILDINGS[effectiveTool]?.label || effectiveTool} ${Math.round(added.progress)}%`)
-      // broadcast también para cola (cuando termine se hace via buildQueue watcher en App)
       broadcastIfMulti(cell.x, cell.y, effectiveTool)
       return
     }
@@ -342,11 +351,10 @@ function handleCellClick(cell) {
   }
 }
 
-function handleCellEnter(cell) {
+async function handleCellEnter(cell) {
   if (!isPainting.value) return
   if (wasDragging) return
   if (!city.selectedTool) return
-  // Demoler arrastrando (como pintar) — sin spam de aviso
   if (city.selectedTool === 'demolish') {
     city.demolish(cell.x, cell.y)
     return
@@ -358,19 +366,26 @@ function handleCellEnter(cell) {
     if (!res.ok && res.reason && !res.reason.startsWith('Ya es')) showAviso(res.reason)
     return
   }
-  if (single.isActive) {
+  if (single.isActive || isMulti.value) {
     let effectiveTool = city.selectedTool
     if (effectiveTool === 'residential' && city.selectedHouseVariant !== 'residential') effectiveTool = city.selectedHouseVariant
     const dur = buildQueue.durationFor(effectiveTool)
+    let ownerId = 'p0'
+    if (single.isActive) ownerId = single.humanPlayer()?.id || 'p0'
+    else {
+      try { const { data: { user } } = await supabase.auth.getUser(); if (user) ownerId = user.id } catch {}
+    }
     if (dur === 0) {
-      const res = city.placeBuildingAt(cell.x, cell.y, effectiveTool, single.humanPlayer()?.id || 'p0')
+      const res = city.placeBuildingAt(cell.x, cell.y, effectiveTool, ownerId)
       if (!res.ok && res.reason) console.warn(`[Jandocity] ${res.reason} en (${cell.x},${cell.y})`)
+      else broadcastIfMulti(cell.x, cell.y, effectiveTool)
       return
     } else {
       if (buildQueue.findAt(cell.x, cell.y)) return
       const validation = canPlaceAt(city.grid, cell.x, cell.y, effectiveTool, city.money)
       if (!validation.ok) return
-      buildQueue.add(cell.x, cell.y, effectiveTool, single.humanPlayer()?.id || 'p0')
+      const added = buildQueue.add(cell.x, cell.y, effectiveTool, ownerId)
+      if (added) broadcastIfMulti(cell.x, cell.y, effectiveTool)
       return
     }
   }
@@ -434,8 +449,8 @@ function handleCellEnter(cell) {
         </template>
       </div>
 
-      <!-- Cola construcción Un Jugador 0-100% — solo barra, sin azul -->
-      <div v-if="single.isActive" class="absolute inset-0 pointer-events-none">
+      <!-- Cola construcción 0-100% — single y multi -->
+      <div v-if="filteredBuildQueue.length" class="absolute inset-0 pointer-events-none">
         <div
           v-for="q in filteredBuildQueue"
           :key="'bq'+q.id"
@@ -460,8 +475,8 @@ function handleCellEnter(cell) {
           </div>
         </div>
       </div>
-      <!-- Cola unidades (policía/soldado/tanque) -->
-      <div v-if="single.isActive" class="absolute inset-0 pointer-events-none">
+      <!-- Cola unidades (policía/soldado/tanque) — single y multi -->
+      <div v-if="filteredUnitQueue.length" class="absolute inset-0 pointer-events-none">
         <div
           v-for="q in filteredUnitQueue"
           :key="'uq'+q.id"

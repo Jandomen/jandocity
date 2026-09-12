@@ -53,6 +53,7 @@ export function useMultiplayerSync(roomKey) {
   }
 
   function leave() { if (channel) supabase.removeChannel(channel); channel=null; remotePlayers.value = new Map() }
+  function isActive() { return !!channel }
 
-  return { join, broadcastBuild, broadcastChat, broadcastPlayerPos, broadcastLeave, remotePlayers, leave }
+  return { join, broadcastBuild, broadcastChat, broadcastPlayerPos, broadcastLeave, remotePlayers, isActive, leave }
 }
