@@ -77,25 +77,18 @@ npm run preview
 
 ---
 
-## 📦 APK Android
+## 🎮 Modos de Juego
 
-```bash
-# Sincroniza web → Android
-npx cap sync
+> **Tú eliges cómo construir tu imperio — cada modo es una ciudad distinta**
 
-# Build debug (4MB)
-cd android && ./gradlew assembleDebug
-# APK en: android/app/build/outputs/apk/debug/app-debug.apk
+| Modo | Jugadores | Estilo | Tu Rol |
+|------|-----------|--------|--------|
+| **🌍 Libre** | Solo | Creativo puro | Construye sin límites, sin guerras. Tu mundo infinito `150×150` con `10` protagonistas a elegir 👤. Pinta lagos, carreteras y rieles, ve aviones aterrizar y peatones cobrar vida. |
+| **👤 Un Jugador** | 1 vs 1-3 CPU | Estrategia | Elige colores, vs `CPU` con tácticas. Construye con cola `0-100%` y comanda `SWAT/Francotirador` a pie mientras `🚀` caen vía mapa. |
+| **⚔️ Guerra (Multi 8)** | Hasta 8 | Competitivo | Sala `JND-XXXX`, anfitrión ya listo. Cola `%` para no ser fácil, `💣 Atómica` deja escombros negros → pasto, alarmas a otras ciudades. ¡Último en pie gana! |
+| **🏗️ Coop Libre (Multi 8)** | Hasta 8 | Cooperativo | Mismo mundo del anfitrión, **instantáneo** sin cola. Host activa `Demoler ajeno/Recursos/Combate` en vivo, re-entra con la misma clave si te caes. ¡Construyan la megaciudad juntos! |
 
-# Copia bonita
-cp android/app/build/outputs/apk/debug/app-debug.apk ~/Desktop/Jandocity.apk
-```
-
-> 💡 Si tu cel y PC están en el mismo WiFi, levanta server rápido:
-> ```bash
-> cd ~/Desktop && python3 -m http.server 8000
-> # En Android: http://TU_IP:8000/Jandocity.apk
-> ```
+> 💡 Cada protagonista tiene historia — de `Ejecutivo` a `Obrero` y `Médica`, tu avatar camina la ciudad que tú levantas.
 
 ---
 
