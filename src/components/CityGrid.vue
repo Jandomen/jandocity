@@ -43,6 +43,7 @@ const audioMgr = useAudioManager()
 const perf = usePerformance()
 const multiSync = useMultiplayerSync()
 const isMulti = computed(() => { try { return !!multiSync.isActive?.() } catch { return false } })
+const isCoop = computed(() => { try { return multiSync.gameMode.value === 'coop' } catch { return false } })
 const filteredBuildQueue = computed(() => (buildQueue.queue.value || []).filter(q=>!isNaN(q.progress) && q.progress!==undefined))
 const filteredUnitQueue = computed(() => (unitQueue.queue.value || []).filter(q=>!isNaN(q.progress) && q.progress!==undefined))
 const gridSize = computed(() => city.gridSize || 20)
@@ -272,6 +273,10 @@ async function handleCellClick(cell) {
           if (isEnemy) targetInfo = { type: 'building', id: origin.id, isEnemy: true, buildingId: origin.buildingId }
         }
       }
+      if (targetInfo && targetInfo.isEnemy && isMulti.value && isCoop.value && !multiSync.coopSettings.value.allowCombat) {
+        showAviso('⛔ Combate desactivado por host')
+        return
+      }
       if (targetInfo || (!pedAt && !vehAt)) {
         selection.commandTo(cell.x, cell.y, targetInfo)
         showAviso(targetInfo ? `⚔️ Atacando ${targetInfo.type}` : `🏃 Moviendo a (${cell.x},${cell.y})`)
@@ -284,6 +289,16 @@ async function handleCellClick(cell) {
     }
   } else {
     if (!city.selectedTool) return
+  }
+  if (city.selectedTool === 'demolish' && isMulti.value && isCoop.value && !multiSync.coopSettings.value.allowDemolishOthers) {
+    let origin = cell
+    if (cell.isChild && cell.occupiedBy) origin = city.getCell(cell.occupiedBy.x, cell.occupiedBy.y) || cell
+    if (origin && origin.owner) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user && origin.owner !== user.id) { showAviso('⛔ Host desactivó demoler ajeno'); return }
+      } catch {}
+    }
   }
   if (city.selectedTool === 'demolish') {
     const res = city.demolish(cell.x, cell.y)
@@ -315,7 +330,8 @@ async function handleCellClick(cell) {
   if (single.isActive || isMulti.value) {
     let effectiveTool = city.selectedTool
     if (effectiveTool === 'residential' && city.selectedHouseVariant !== 'residential') effectiveTool = city.selectedHouseVariant
-    const dur = buildQueue.durationFor(effectiveTool)
+    const isCoopInstant = isMulti.value && isCoop.value
+    const dur = isCoopInstant ? 0 : buildQueue.durationFor(effectiveTool)
     let ownerId = 'p0'
     if (single.isActive) ownerId = single.humanPlayer()?.id || 'p0'
     else {
@@ -369,7 +385,8 @@ async function handleCellEnter(cell) {
   if (single.isActive || isMulti.value) {
     let effectiveTool = city.selectedTool
     if (effectiveTool === 'residential' && city.selectedHouseVariant !== 'residential') effectiveTool = city.selectedHouseVariant
-    const dur = buildQueue.durationFor(effectiveTool)
+    const isCoopInstant = isMulti.value && isCoop.value
+    const dur = isCoopInstant ? 0 : buildQueue.durationFor(effectiveTool)
     let ownerId = 'p0'
     if (single.isActive) ownerId = single.humanPlayer()?.id || 'p0'
     else {

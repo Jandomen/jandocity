@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useCityStore } from '@/stores/cityStore.js'
 import { useMultiplayerSync } from '@/composables/useMultiplayerSync.js'
 import { getCharacter } from '@/config/characters.js'
@@ -8,6 +8,12 @@ const city = useCityStore()
 const multi = useMultiplayerSync()
 
 const players = computed(() => Array.from(multi.remotePlayers.value.values()))
+const disconnected = computed(() => Array.from(multi.disconnected.value.entries()).map(([id, d]) => ({ id, ...d })))
+const nowTick = ref(Date.now())
+let tick = null
+onMounted(() => { tick = setInterval(() => nowTick.value = Date.now(), 1000) })
+onUnmounted(() => clearInterval(tick))
+function secondsLeft(leftAt) { return Math.max(0, 45 - Math.floor((nowTick.value - leftAt)/1000)) }
 
 function posFor(p) {
   const ox = city.offsetX ?? city.grid[0]?.[0]?.x ?? 0

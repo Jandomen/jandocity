@@ -6,6 +6,7 @@ import PerformancePanel from '@/components/PerformancePanel.vue'
 import { useSinglePlayerStore } from '@/stores/singlePlayerStore.js'
 import { useCityStore } from '@/stores/cityStore.js'
 import { useTrafficStore } from '@/stores/trafficStore.js'
+import { useMultiplayerSync } from '@/composables/useMultiplayerSync.js'
 
 defineProps({
   show: { type: Boolean, default: false },
@@ -24,6 +25,12 @@ function openCharacterSelect() {
 const prizes = computed(() => {
   try { return JSON.parse(localStorage.getItem('jandocity-prizes') || '[]').slice(0,5) } catch { return [] }
 })
+const multiSync = useMultiplayerSync()
+const isCoop = computed(() => { try { return multiSync.isActive() && multiSync.gameMode.value === 'coop' } catch { return false } })
+function toggleCoopSetting(key) {
+  const cur = multiSync.coopSettings.value[key]
+  multiSync.setCoopSettings({ [key]: !cur })
+}
 </script>
 
 <template>
@@ -62,6 +69,13 @@ const prizes = computed(() => {
               <div class="text-xs font-black text-white">🏆 Historial Premios</div>
               <div v-if="prizes.length===0" class="text-[11px] text-white/40">Sin premios — gana cuando el rival se sale</div>
               <div v-for="pr in prizes" :key="pr.date" class="text-[10px] text-white/70 border-b border-white/10 py-1 flex justify-between"><span>{{ new Date(pr.date).toLocaleDateString() }} {{ pr.reason }}</span><span class="font-mono">{{ pr.room }}</span></div>
+            </div>
+            <div v-if="isCoop" class="bg-[#0f172a] border-2 border-emerald-400/30 rounded-xl p-3 space-y-2">
+              <div class="text-xs font-black text-emerald-300">🏗️ Coop Libre 8 — Host en vivo</div>
+              <label class="flex items-center justify-between text-xs cursor-pointer"><span>Demoler ajeno</span><input type="checkbox" :checked="multiSync.coopSettings.value.allowDemolishOthers" @change="toggleCoopSetting('allowDemolishOthers')" class="accent-emerald-500" /></label>
+              <label class="flex items-center justify-between text-xs cursor-pointer"><span>Recursos compartidos</span><input type="checkbox" :checked="multiSync.coopSettings.value.sharedResources" @change="toggleCoopSetting('sharedResources')" class="accent-emerald-500" /></label>
+              <label class="flex items-center justify-between text-xs cursor-pointer"><span>Combate</span><input type="checkbox" :checked="multiSync.coopSettings.value.allowCombat" @change="toggleCoopSetting('allowCombat')" class="accent-emerald-500" /></label>
+              <p class="text-[10px] text-white/40">Cambios se notifican a todos con toast.</p>
             </div>
           </template>
 

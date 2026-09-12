@@ -1,14 +1,20 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { supabase } from '@/lib/supabase.js'
 import { useSinglePlayerStore } from '@/stores/singlePlayerStore.js'
+import { useMultiplayerSync } from '@/composables/useMultiplayerSync.js'
 
 const emit = defineEmits(['start','back'])
 const single = useSinglePlayerStore()
+const multiSync = useMultiplayerSync()
 const mode = ref('menu') // menu | host | join | lobby
 const key = ref('')
 const room = ref(null)
 const myColor = ref('blue')
+const selectedGameMode = ref('war') // war | coop
+const coopAllowDemolish = ref(false)
+const coopSharedResources = ref(false)
+const coopAllowCombat = ref(false)
 const players = ref([]) // {id, username, color, isHost, ready}
 const loading = ref(false)
 const error = ref('')
@@ -21,11 +27,17 @@ async function createRoom() {
   if (!user) { error.value='Debes iniciar sesión'; loading.value=false; return }
   const k = genKey()
   key.value = k
-  const { data, error: err } = await supabase.from('rooms').insert({ key: k, host_id: user.id, max_players: 8, players: [{ id: user.id, username: user.email.split('@')[0], color: myColor.value, isHost: true, ready: true }], status: 'waiting' }).select().single()
+  const status = selectedGameMode.value === 'coop' ? 'waiting_coop' : 'waiting'
+  const { data, error: err } = await supabase.from('rooms').insert({ key: k, host_id: user.id, max_players: 8, players: [{ id: user.id, username: user.email.split('@')[0], color: myColor.value, isHost: true, ready: true }], status }).select().single()
   if (err) { error.value=err.message; loading.value=false; return }
   room.value = data
   players.value = data.players
   mode.value='lobby'
+  // host guarda modo y settings para coop
+  multiSync.gameMode.value = selectedGameMode.value
+  if (selectedGameMode.value === 'coop') {
+    multiSync.coopSettings.value = { allowDemolishOthers: coopAllowDemolish.value, sharedResources: coopSharedResources.value, allowCombat: coopAllowCombat.value }
+  }
   subscribe()
   loading.value=false
 }
@@ -79,11 +91,34 @@ async function startGame() {
 }
 
 async function loadPublic() {
-  const { data } = await supabase.from('rooms').select('*').eq('status','waiting').limit(10)
+  const { data } = await supabase.from('rooms').select('*').in('status',['waiting','waiting_coop']).limit(10)
   return data || []
 }
 const publicRooms = ref([])
-onMounted(async () => { publicRooms.value = await loadPublic() })
+const myId = ref(null)
+onMounted(async () => {
+  publicRooms.value = await loadPublic()
+  const { data: { user } } = await supabase.auth.getUser()
+  myId.value = user?.id || null
+  window.addEventListener('multi-coop-settings', (e) => {
+    coopAllowDemolish.value = !!e.detail.allowDemolishOthers
+    coopSharedResources.value = !!e.detail.sharedResources
+    coopAllowCombat.value = !!e.detail.allowCombat
+  })
+  window.addEventListener('multi-game-mode', (e) => {
+    selectedGameMode.value = e.detail.mode || 'war'
+  })
+})
+watch([coopAllowDemolish, coopSharedResources, coopAllowCombat], () => {
+  if (!room.value || !room.value.status.includes('coop')) return
+  // solo host puede cambiar
+  const me = players.value.find(p=>p.id===myId.value)
+  if (!me?.isHost) return
+  const patch = { allowDemolishOthers: coopAllowDemolish.value, sharedResources: coopSharedResources.value, allowCombat: coopAllowCombat.value }
+  multiSync.setCoopSettings(patch)
+  // notifica
+  window.dispatchEvent(new CustomEvent('multi-chat', { detail: { sender: 'Sistema', text: `Host cambió Coop: Demoler ${patch.allowDemolishOthers?'ON':'OFF'}, Recursos ${patch.sharedResources?'compartidos':'individual'}, Combate ${patch.allowCombat?'ON':'OFF'}`, time: new Date().toLocaleTimeString(), at: Date.now() } }))
+})
 </script>
 
 <template>
@@ -120,6 +155,18 @@ onMounted(async () => { publicRooms.value = await loadPublic() })
       </div>
 
       <div v-else-if="mode==='host'" class="bg-[#1e293b] border-[3px] border-[#334155] rounded-xl shadow-[0_8px_0_#0f172a] p-4 space-y-3">
+        <div class="text-xs font-bold" style="color:#fde68a;">Modo de partida (8 máx)</div>
+        <div class="grid grid-cols-2 gap-2">
+          <button @click="selectedGameMode='war'" class="py-3 rounded-xl border-2 flex flex-col items-center gap-1 shadow-[0_4px_0_#0f172a]" :class="selectedGameMode==='war' ? 'bg-[#581c87] border-[#a78bfa] text-white' : 'bg-[#0f172a] border-[#334155] text-white/60'"><span class="text-lg">⚔️</span><span class="text-xs font-black">Guerra</span><span class="text-[9px]">Con cola %</span></button>
+          <button @click="selectedGameMode='coop'" class="py-3 rounded-xl border-2 flex flex-col items-center gap-1 shadow-[0_4px_0_#0f172a]" :class="selectedGameMode==='coop' ? 'bg-[#14532d] border-[#16a34a] text-white' : 'bg-[#0f172a] border-[#334155] text-white/60'"><span class="text-lg">🏗️</span><span class="text-xs font-black">Coop Libre</span><span class="text-[9px]">Instantáneo</span></button>
+        </div>
+        <div v-if="selectedGameMode==='coop'" class="bg-[#0f172a] border-2 border-[#334155] rounded-lg p-2 space-y-2">
+          <div class="text-[11px] font-bold text-white">Host configura Coop</div>
+          <label class="flex items-center justify-between text-xs cursor-pointer"><span>Demoler ajeno</span><input type="checkbox" v-model="coopAllowDemolish" class="accent-emerald-500" /></label>
+          <label class="flex items-center justify-between text-xs cursor-pointer"><span>Recursos compartidos</span><input type="checkbox" v-model="coopSharedResources" class="accent-emerald-500" /></label>
+          <label class="flex items-center justify-between text-xs cursor-pointer"><span>Combate</span><input type="checkbox" v-model="coopAllowCombat" class="accent-emerald-500" /></label>
+          <p class="text-[10px] text-white/40">Se notifica a todos al cambiar en vivo. Construcción instantánea.</p>
+        </div>
         <div class="text-xs font-bold" style="color:#fde68a;">Tu color anfitrión</div>
         <div class="flex gap-1.5 flex-wrap">
           <button v-for="c in single.COLORS" :key="c.id" @click="myColor=c.id" class="w-7 h-7 rounded-full border-2 shadow-[0_2px_0_#0f172a]" :style="{background:c.bg, borderColor: myColor===c.id ? '#fff' : 'transparent'}"></button>
@@ -144,6 +191,15 @@ onMounted(async () => { publicRooms.value = await loadPublic() })
         <div class="flex items-center gap-2">
           <span class="text-xs">Tu color:</span>
           <button v-for="c in single.COLORS" :key="c.id" @click="myColor=c.id; updateMyColor()" class="w-6 h-6 rounded-full border-2 shadow-[0_2px_0_#0f172a]" :style="{background:c.bg, borderColor: myColor===c.id ? '#fff' : 'transparent'}"></button>
+        </div>
+        <div v-if="room?.status?.includes('coop') && players.find(p=>p.id===myId)?.isHost" class="bg-[#0f172a] border-2 border-amber-400/30 rounded-lg p-2 space-y-2">
+          <div class="text-[11px] font-bold text-amber-300">Host Coop en vivo (instantáneo)</div>
+          <label class="flex items-center justify-between text-xs cursor-pointer"><span>Demoler ajeno</span><input type="checkbox" v-model="coopAllowDemolish" class="accent-emerald-500" /></label>
+          <label class="flex items-center justify-between text-xs cursor-pointer"><span>Recursos compartidos</span><input type="checkbox" v-model="coopSharedResources" class="accent-emerald-500" /></label>
+          <label class="flex items-center justify-between text-xs cursor-pointer"><span>Combate</span><input type="checkbox" v-model="coopAllowCombat" class="accent-emerald-500" /></label>
+        </div>
+        <div v-else-if="room?.status?.includes('coop')" class="bg-black/20 border border-white/10 rounded-lg p-2 text-[11px] text-white/60">
+          Coop Libre 8 — instantáneo. Host: {{ players.find(p=>p.isHost)?.username }} controla permisos. Demoler {{ multiSync.coopSettings.value.allowDemolishOthers ? 'ON' : 'OFF' }} • Recursos {{ multiSync.coopSettings.value.sharedResources ? 'compartidos' : 'individual' }} • Combate {{ multiSync.coopSettings.value.allowCombat ? 'ON' : 'OFF' }}
         </div>
         <button @click="toggleReady" class="w-full py-2 rounded-xl font-bold text-sm border-2 shadow-[0_4px_0_#0f172a]" :class="players.find(p=>p.id && p.ready) ? 'bg-white/10 border-white/10 text-white/70' : 'bg-sky-600 border-sky-400 text-white'">{{ players.find(p=>p.ready) ? 'Desmarcar' : '✓ Confirmar listo' }}</button>
         <p class="text-[11px] text-white/40">Anfitrión entra directo (ya listo). Invitados confirman ✓. Colores duplicados permitidos. Reconexión auto.</p>
