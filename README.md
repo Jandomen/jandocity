@@ -1,21 +1,15 @@
 # 🏙️ JANDOCITY — Construye • Gestiona • Expande
 
-> 🌍 Tu ciudad infinita en la web y en APK Android. ¡Pinta carreteras, expande el mapa y ve tu mundo cobrar vida!
-
-[![Vite](https://img.shields.io/badge/Vite-5.x-646CFF?logo=vite)](https://vitejs.dev/)
-[![Vue](https://img.shields.io/badge/Vue-3.x-4FC08D?logo=vue.js)](https://vuejs.org/)
-[![Capacitor](https://img.shields.io/badge/Capacitor-6.x-119EFF?logo=capacitor)](https://capacitorjs.com/)
-[![PWA](https://img.shields.io/badge/PWA-✓-5A0FC8)](https://web.dev/progressive-web-apps/)
+> 🌍 Tu ciudad infinita donde cada calle cuenta. ¡Pinta carreteras, expande el mapa y ve tu mundo cobrar vida!
 
 ---
 
 ## ✨ ¿Qué es Jandocity?
 
-Jandocity es un **city-builder 2D** estilo GTA vista cenital donde **tú eres el protagonista** 👤. Camina con `WASD`, construye con un click y ve cómo **vehículos 🚗, peatones 🚶, policías 🚔, ambulancias 🚑, estudiantes 🎒 y hasta aviones 🛬** cobran vida automáticamente.
+Jandocity es un **city-builder 2D** estilo GTA vista cenital donde **tú eres el protagonista** 👤. Camina, construye y ve cómo **vehículos 🚗, peatones 🚶, policías 🚔, ambulancias 🚑, estudiantes 🎒 y hasta aviones 🛬** cobran vida automáticamente.
 
-* **🗺️ Mundo infinito** — `150×150` base centrado en `0,0`, se expande `+10` al tocar bordes o con `I` hacia donde miras.
-* **💾 Mundos locales** — crea / elimina mundos ilimitados en `localStorage` (offline ✓).
-* **🎮 Jugable en todo** — web + **APK 4MB** con joystick / D-Pad y carrusel móvil.
+* **🗺️ Mundo infinito** — `150×150` que se expande `+10` al explorar.
+* **💾 Mundos infinitos** — crea tu propia colección de ciudades.
 
 ---
 
@@ -40,40 +34,9 @@ Jandocity es un **city-builder 2D** estilo GTA vista cenital donde **tú eres el
 - **🚑 Ambulancias + 🩺 Médicos** rescatan **⚠️ accidentes** y llevan al hospital
 - **🎒 Estudiantes** (escuela/uni) + **⚖️ Abogados/Jueces** (juzgado) caminan lento y se dispersan (¡corren si ven criminal!)
 
-### 📱 Móvil / APK
-- **🕹️ Joystick thumb ◉** ↔ **✜ D-Pad cruz** (cambiable en pausa)
-- **🎠 Carrusel inferior** — 1 línea extendida (donde estaba “Presiona H”), modal centrado con **✕ Cerrar** abajo
-- **🎮 Botones flotantes izq** `⟲ ? − 🧨` + joystick der, header `py-1` 1 línea
-
-### ⏸️ Pausa & Audio
-- **Esc ⏸️** pausa con **Reanudar / 🔊 Audio / 🎮 Controles / Palanca / Salir al menú**
-- **15 pistas** `🎵` con `N` para siguiente + ambiente y efectos
-
----
-
-## 🧱 Stack
-
-`Vue 3` + `Pinia` + `Vite 5` + `Tailwind` + `Capacitor 6` + `PWA (Workbox)` + `Supabase` (futuro online)
-
----
-
-## 🚀 Instalación
-
-```bash
-# 1. Clona
-git clone <tu-repo> && cd jandocity
-
-# 2. Instala
-npm install
-
-# 3. Dev (web)
-npm run dev
-# → http://localhost:5173
-
-# 4. Build web
-npm run build
-npm run preview
-```
+### 🎵 Ciudad Viva
+- **⏸️ Pausa** con reanudar, audio y controles
+- **15 pistas** que acompañan tu construcción
 
 ---
 
@@ -92,37 +55,9 @@ npm run preview
 
 ---
 
-## 🎮 Controles
+## 🌆 Vive tu Ciudad
 
-| Tecla | Acción |
-|-------|--------|
-| `WASD / Flechas` | Mover protagonista |
-| `Click izq` / `Arrastrar` | Pintar / construir |
-| `Click der` / `Arrastrar` | Demoler (`🧨`) / Mantén para borrar |
-| `Rueda / Pinch` | Zoom |
-| `H` | Ocultar/mostrar UI |
-| `N` | Siguiente pista 🎵 |
-| `I` | Expandir +10 hacia donde miras |
-| `M` | Ver cuadrantes `10×10` |
-| `Esc` | ⏸️ Pausa |
-
-Móvil: carrusel categorías abajo + modal + joystick/D-Pad.
-
----
-
-## 🗂️ Estructura
-
-```
-src/
-├── components/   # CityGrid, ToolPalette, MobileToolCarousel, PauseMenu, VehicleLayer...
-├── stores/       # cityStore, trafficStore, playerStore
-├── composables/  # useServiceSpawns, useAirportSpawns, useCamera...
-├── constants/    # buildings.js, terrain.js
-├── utils/        # worldPersistence, terrainGenerator
-└── audio/        # music/ambient/effects
-android/          # Proyecto Capacitor
-public/           # favicon, pwa icons
-```
+Cada decisión transforma tu mundo. Desde la primera casa hasta la metrópoli, tu protagonista camina entre lo que has creado. Construye, gestiona y expande sin límites.
 
 ---
 
