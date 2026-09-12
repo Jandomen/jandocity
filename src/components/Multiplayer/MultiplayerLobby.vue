@@ -12,6 +12,7 @@ const key = ref('')
 const room = ref(null)
 const myColor = ref('blue')
 const selectedGameMode = ref('war') // war | coop
+const isPublicRoom = ref(true) // Pública vs Privada
 const coopAllowDemolish = ref(false)
 const coopSharedResources = ref(false)
 const coopAllowCombat = ref(false)
@@ -27,7 +28,8 @@ async function createRoom() {
   if (!user) { error.value='Debes iniciar sesión'; loading.value=false; return }
   const k = genKey()
   key.value = k
-  const status = selectedGameMode.value === 'coop' ? 'waiting_coop' : 'waiting'
+  let status = selectedGameMode.value === 'coop' ? 'waiting_coop' : 'waiting'
+  if (!isPublicRoom.value) status = 'private_' + status
   const { data, error: err } = await supabase.from('rooms').insert({ key: k, host_id: user.id, max_players: 8, players: [{ id: user.id, username: user.email.split('@')[0], color: myColor.value, isHost: true, ready: true }], status }).select().single()
   if (err) { error.value=err.message; loading.value=false; return }
   room.value = data
@@ -160,6 +162,11 @@ watch([coopAllowDemolish, coopSharedResources, coopAllowCombat], () => {
           <button @click="selectedGameMode='war'" class="py-3 rounded-xl border-2 flex flex-col items-center gap-1 shadow-[0_4px_0_#0f172a]" :class="selectedGameMode==='war' ? 'bg-[#581c87] border-[#a78bfa] text-white' : 'bg-[#0f172a] border-[#334155] text-white/60'"><span class="text-lg">⚔️</span><span class="text-xs font-black">Guerra</span><span class="text-[9px]">Con cola %</span></button>
           <button @click="selectedGameMode='coop'" class="py-3 rounded-xl border-2 flex flex-col items-center gap-1 shadow-[0_4px_0_#0f172a]" :class="selectedGameMode==='coop' ? 'bg-[#14532d] border-[#16a34a] text-white' : 'bg-[#0f172a] border-[#334155] text-white/60'"><span class="text-lg">🏗️</span><span class="text-xs font-black">Coop Libre</span><span class="text-[9px]">Instantáneo</span></button>
         </div>
+        <div class="flex gap-2">
+          <button @click="isPublicRoom=true" class="flex-1 py-2 rounded-xl border-2 text-xs font-black shadow-[0_3px_0_#0f172a]" :class="isPublicRoom ? 'bg-sky-600 border-sky-400 text-white' : 'bg-[#0f172a] border-[#334155] text-white/60'">🌐 Pública</button>
+          <button @click="isPublicRoom=false" class="flex-1 py-2 rounded-xl border-2 text-xs font-black shadow-[0_3px_0_#0f172a]" :class="!isPublicRoom ? 'bg-amber-600 border-amber-400 text-white' : 'bg-[#0f172a] border-[#334155] text-white/60'">🔒 Privada</button>
+        </div>
+        <p class="text-[10px] text-white/40">{{ isPublicRoom ? 'Aparece en servidores públicos' : 'Solo con clave JND-XXXX' }}</p>
         <div v-if="selectedGameMode==='coop'" class="bg-[#0f172a] border-2 border-[#334155] rounded-lg p-2 space-y-2">
           <div class="text-[11px] font-bold text-white">Host configura Coop</div>
           <label class="flex items-center justify-between text-xs cursor-pointer"><span>Demoler ajeno</span><input type="checkbox" v-model="coopAllowDemolish" class="accent-emerald-500" /></label>
@@ -178,7 +185,7 @@ watch([coopAllowDemolish, coopSharedResources, coopAllowCombat], () => {
 
       <div v-else-if="mode==='lobby'" class="bg-[#1e293b] border-[3px] border-[#334155] rounded-xl shadow-[0_8px_0_#0f172a] p-4 space-y-3">
         <div class="flex items-center justify-between">
-          <span class="font-black text-sm" style="color:#fde68a;">Sala {{ room?.key }}</span>
+          <span class="font-black text-sm" style="color:#fde68a;">Sala {{ room?.key }} <span class="text-[10px] px-1.5 py-0.5 rounded-full" :class="room?.status?.includes('coop') ? 'bg-[#14532d] text-white border border-[#16a34a]' : 'bg-[#581c87] text-white border border-[#a78bfa]'">{{ room?.status?.includes('coop') ? '🏗️ Coop' : '⚔️ Guerra' }}</span> <span v-if="room?.status?.includes('private')" class="text-[10px] bg-amber-600 text-white px-1.5 py-0.5 rounded-full">🔒 Privada</span><span v-else class="text-[10px] bg-emerald-600 text-white px-1.5 py-0.5 rounded-full">🌐 Pública</span></span>
           <span class="text-xs bg-black/30 px-2 py-1 rounded-full border border-white/10">{{ players.length }}/8</span>
         </div>
         <div class="grid grid-cols-2 gap-2">
