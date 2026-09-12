@@ -116,6 +116,7 @@ function scheduleAutoNext() {
       currentTrackId = nextId
       currentIndex = TRACK_ORDER.indexOf(nextId)
       playChiptune(TRACKS[nextId], true)
+      try { window.dispatchEvent(new CustomEvent('track-toast', { detail: nextId })) } catch {}
     }, 1700)
   }, 120000)
 }
@@ -144,7 +145,8 @@ function playChiptune(track, fromAuto = false) {
     gainNode.gain.linearRampToValueAtTime(isMuted ? 0 : 0.34, ctx.currentTime + 1.2)
   }
   scheduleAutoNext()
-  const tick = isAndroidLow ? 60000 / track.bpm / 1 : isLowEnd ? 60000 / track.bpm / 1.5 : 60000 / track.bpm / 2
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+  const tick = isAndroidLow ? 60000 / track.bpm / 1 : isMobile ? 60000 / track.bpm / 1.3 : isLowEnd ? 60000 / track.bpm / 1.5 : 60000 / track.bpm / 2
   let step = 0
 
   // Bajo continuo 8-bit — omitido en Android low para no trabar
@@ -191,11 +193,12 @@ function playChiptune(track, fromAuto = false) {
     }
     osc.start(); osc.stop(ctx.currentTime + tick/1000)
     currentOscs.push(osc, gain)
-    if (currentOscs.length > (isAndroidLow ? 8 : isLowEnd ? 14 : 24)) currentOscs.splice(0,3)
+    const isMobile2 = typeof window !== 'undefined' && window.innerWidth < 768
+    if (currentOscs.length > (isAndroidLow ? 8 : isMobile2 ? 12 : isLowEnd ? 14 : 24)) currentOscs.splice(0,3)
 
-    // ritmo por pista: techno/house → four-on-floor, calma → sparse, tensión → doble hi-hat
-    // En móvil low-end se omite hi-hat/kick para no saturar CPU
-    if (!isLowEnd) {
+    // ritmo por pista — en móvil se simplifica mucho para no trabar
+    const isMobile3 = typeof window !== 'undefined' && window.innerWidth < 768
+    if (!isLowEnd && !isMobile3 && !isAndroidLow) {
       const isTechno = ['techno','house','trance','hardcore','ambient_techno','electro'].includes(Object.keys(TRACKS).find(k=>TRACKS[k]===track))
       const isCalm = ['calma','noche','serenidad','paz'].includes(Object.keys(TRACKS).find(k=>TRACKS[k]===track))
       if (isTechno) {
@@ -255,6 +258,7 @@ export function createMusicManager() {
       currentTrackId = trackId
       currentIndex = TRACK_ORDER.indexOf(trackId)
       playChiptune(TRACKS[trackId], fromAuto)
+      try { window.dispatchEvent(new CustomEvent('track-toast', { detail: trackId })) } catch {}
     },
     next() {
       // desvanecimiento antes de siguiente manual

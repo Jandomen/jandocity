@@ -89,7 +89,7 @@ function showTrackToast(id) {
   if (!t) return
   trackToast.value = `${t.label} • ${t.mood}`
   clearTimeout(trackToastTimer)
-  trackToastTimer = setTimeout(() => trackToast.value = null, 2200)
+  trackToastTimer = setTimeout(() => trackToast.value = null, 3200)
 }
 watch(() => audioMgr.music.currentTrack, (id) => showTrackToast(id))
 const multiSync = useMultiplayerSync()
@@ -450,8 +450,9 @@ onMounted(async () => {
 
   const tryAutoPlay = () => {
     try {
+      const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
       const isAndroidLow = /Android/i.test(navigator.userAgent || '') && ((navigator.deviceMemory || 4) <= 4 || (navigator.hardwareConcurrency || 4) <= 4)
-      if (isAndroidLow) { audioMgr.init(); return }
+      if (isMobile || isAndroidLow) { audioMgr.init(); return }
       audioMgr.init()
       if (!audioMgr.music.currentTrack || audioMgr.music.currentTrack === 'calma') {
         audioMgr.music.play('calma')
@@ -540,6 +541,14 @@ onUnmounted(() => {
       <!-- Victoria / Derrota -->
       <VictoryOverlay :show="showVictory" :isWin="victoryData?.isWin" :winner="victoryData?.winner" :metrics="victoryData?.metrics" @menu="closeVictory(true)" @rematch="closeVictory(false)" />
       <AtomicFlash :trigger="atomicTrigger" :heavy="atomicHeavy" />
+      <Transition name="fade">
+        <div v-if="trackToast && appState==='playing'" class="fixed top-[88px] left-1/2 -translate-x-1/2 z-[70] pointer-events-none">
+          <div class="bg-[#1e293b] border-[3px] border-[#334155] rounded-full px-5 py-2.5 shadow-[0_8px_0_#0f172a,0_8px_16px_rgba(0,0,0,0.4)] flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="text-xs font-black text-white">🎵 {{ trackToast }}</span>
+          </div>
+        </div>
+      </Transition>
       <Transition name="fade">
         <div v-if="atomicAlarm && appState==='playing'" class="fixed top-[44px] inset-x-0 z-[70] flex justify-center pointer-events-none">
           <div class="px-4 py-2 rounded-full border-2 font-black text-xs tracking-widest shadow-[0_4px_16px_rgba(0,0,0,0.5)] flex items-center gap-2 animate-pulse" :class="atomicAlarm.heavy ? 'bg-orange-600 border-orange-300 text-white' : 'bg-red-600 border-red-300 text-white'">

@@ -25,6 +25,32 @@ function openCharacterSelect() {
 const prizes = computed(() => {
   try { return JSON.parse(localStorage.getItem('jandocity-prizes') || '[]').slice(0,5) } catch { return [] }
 })
+const confirmDeleteAccount = ref(false)
+const showThankYou = ref(false)
+async function handleDeleteAccount() {
+  if (!confirmDeleteAccount.value) { confirmDeleteAccount.value = true; setTimeout(()=> confirmDeleteAccount.value=false, 4000); return }
+  try {
+    const { supabase } = await import('@/lib/supabase.js')
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      try { await supabase.from('profiles').delete().eq('id', user.id) } catch {}
+      try { await supabase.auth.signOut() } catch {}
+    }
+    try {
+      localStorage.removeItem('jandocity-player');
+      localStorage.removeItem('jandocity-prizes');
+      localStorage.removeItem('jandocity-worlds-v1');
+      localStorage.removeItem('jandocity-active-world');
+      localStorage.removeItem('jandocity-save-v1');
+      localStorage.removeItem('jandocity-character');
+      localStorage.removeItem('jandocity-joystick');
+    } catch {}
+    try { city.deleteSave(); } catch {}
+    try { traffic.clear(); } catch {}
+    showThankYou.value = true
+    setTimeout(() => { showThankYou.value = false; emit('exit') }, 2600)
+  } catch {}
+}
 const multiSync = useMultiplayerSync()
 const isCoop = computed(() => { try { return multiSync.isActive() && multiSync.gameMode.value === 'coop' } catch { return false } })
 function toggleCoopSetting(key) {
@@ -77,6 +103,7 @@ function toggleCoopSetting(key) {
               <label class="flex items-center justify-between text-xs cursor-pointer"><span>Combate</span><input type="checkbox" :checked="multiSync.coopSettings.value.allowCombat" @change="toggleCoopSetting('allowCombat')" class="accent-emerald-500" /></label>
               <p class="text-[10px] text-white/40">Cambios se notifican a todos con toast.</p>
             </div>
+            <button @click="handleDeleteAccount" class="w-full py-2.5 rounded-xl font-bold text-xs border-2 flex items-center justify-center gap-2" :class="confirmDeleteAccount ? 'bg-red-600 border-red-400 text-white animate-pulse' : 'bg-black/30 border-red-500/50 text-red-300 hover:bg-red-950/30'">{{ confirmDeleteAccount ? '¿Seguro? Toca de nuevo para borrar' : '🗑️ Eliminar cuenta y todo' }}</button>
           </template>
 
           <template v-else-if="tab==='audio'">
@@ -113,6 +140,15 @@ function toggleCoopSetting(key) {
         </div>
 
         <div class="shrink-0 px-4 py-2 border-t-[3px] border-[#334155] bg-[#0f172a] text-center text-[10px] text-white/30 font-mono">JANDOSOFT • Pausa</div>
+      </div>
+    </div>
+  </Transition>
+  <Transition name="fade">
+    <div v-if="showThankYou" class="fixed inset-0 z-[80] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+      <div class="bg-[#1e293b] border-[3px] border-[#334155] rounded-2xl p-6 flex flex-col items-center gap-3 max-w-[360px] text-center shadow-[0_8px_0_#0f172a]">
+        <span class="text-4xl">💛</span>
+        <h3 class="font-black text-white" style="font-family:'Cinzel',serif;">Gracias por usar Jandocity</h3>
+        <p class="text-xs text-white/60">Tu cuenta, mundos y progreso han sido eliminados. ¡Vuelve pronto!</p>
       </div>
     </div>
   </Transition>
