@@ -57,11 +57,8 @@ export function detectQuality() {
   const conn = navigator.connection?.effectiveType || '4g'
   const saveData = navigator.connection?.saveData || false
   if (saveData) return 'low'
-  if (!isMobile && mem >= 4 && cores >= 4) return 'high'
-  if (isMobile) {
-    if (mem <= 2 || cores <= 2 || conn === '2g' || conn === 'slow-2g') return 'low'
-    if (mem <= 3 || cores <= 4) return 'medium'
-    return 'medium'
-  }
+  if (!isMobile) return 'high'
+  if (mem <= 2 || cores <= 2 || conn === '2g' || conn === 'slow-2g') return 'low'
+  if (mem <= 3 || cores <= 4) return 'medium'
   return 'medium'
 }
