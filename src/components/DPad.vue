@@ -18,6 +18,5 @@ function move(dx, dy) { player.move(dx, dy, city.grid) }
       <button @touchstart.prevent="move(1,0)" @mousedown.prevent="move(1,0)" class="absolute top-1/2 -translate-y-1/2 right-0 w-10 h-10 rounded-lg bg-black/40 backdrop-blur border border-white/20 text-white flex items-center justify-center active:bg-white/20">▶</button>
       <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-lg bg-white/10 border border-white/10 pointer-events-none"></div>
     </div>
-    <div class="text-center text-[10px] text-white/50 mt-1">D-Pad</div>
   </div>
 </template>

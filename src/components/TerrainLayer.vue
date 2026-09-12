@@ -2,6 +2,8 @@
 import { computed, ref, onMounted, watch } from 'vue'
 import { getWaterMask } from '@/utils/terrainGenerator.js'
 import { createNoise2D } from 'simplex-noise'
+import { usePerformance } from '@/composables/usePerformance.js'
+const perf = usePerformance()
 
 const props = defineProps({
   grid: { type: Array, required: true },
@@ -69,11 +71,12 @@ function drawTexture() {
   ctx.clearRect(0, 0, cw, ch)
   ctx.fillStyle = '#6bbf45'
   ctx.fillRect(0, 0, cw, ch)
-  // Si es muy grande, textura simple sin noise pesado
+  // Modo ahorro o grid grande → textura ultra ligera
   const cells = props.grid.length * (props.grid[0]?.length || 0)
-  if (cells > 10000) {
+  if (!perf.preset.value.terrainNoise || cells > 10000) {
     ctx.fillStyle = 'rgba(143,212,96,0.08)'
-    for (let i = 0; i < 800; i++) {
+    const count = perf.isLowEnd.value ? 220 : 600
+    for (let i = 0; i < count; i++) {
       const x = (i * 137) % cw, y = (i * 241) % ch
       ctx.fillRect(x, y, 2, 2)
     }
@@ -122,8 +125,8 @@ watch(() => props.grid.length + (props.grid[0]?.length||0), () => {
     <!-- Canvas textura real simplex-noise — forma orgánica, no flat -->
     <canvas ref="canvasRef" class="absolute inset-0 w-full h-full"></canvas>
 
-    <!-- Overlay radial para profundidad natural -->
-    <div class="absolute inset-0" style="background: radial-gradient(ellipse at 30% 15%, rgba(168,224,99,0.35) 0%, transparent 45%), radial-gradient(ellipse at 70% 85%, rgba(212,184,150,0.22) 0%, transparent 40%), radial-gradient(ellipse at 20% 90%, rgba(194,168,120,0.18) 0%, transparent 35%);"></div>
+    <!-- Overlay radial para profundidad natural — desactivado en ahorro -->
+    <div v-if="perf.preset.value.shadows" class="absolute inset-0" style="background: radial-gradient(ellipse at 30% 15%, rgba(168,224,99,0.35) 0%, transparent 45%), radial-gradient(ellipse at 70% 85%, rgba(212,184,150,0.22) 0%, transparent 40%), radial-gradient(ellipse at 20% 90%, rgba(194,168,120,0.18) 0%, transparent 35%);"></div>
 
     <!-- Grid virtualizado — solo celdas visibles -->
     <div class="absolute inset-0">
@@ -145,7 +148,8 @@ watch(() => props.grid.length + (props.grid[0]?.length||0), () => {
               cell.terrain === 'wood' ? 'bg-[#a16207] shadow-[inset_0_0_4px_rgba(0,0,0,0.2)]' : '',
               cell.terrain === 'marble' ? 'bg-[#f5f5f4] shadow-[inset_0_0_6px_rgba(0,0,0,0.08)]' : '',
               cell.terrain === 'stone' ? 'bg-[#78716c] shadow-[inset_0_0_4px_rgba(0,0,0,0.2)]' : '',
-              cell.terrain === 'rubble' ? 'bg-[#57534e] shadow-[inset_0_0_6px_rgba(0,0,0,0.35)]' : ''
+              cell.terrain === 'rubble' ? 'bg-[#57534e] shadow-[inset_0_0_6px_rgba(0,0,0,0.35)]' : '',
+              cell.terrain === 'scorched' ? 'bg-[#0a0a0a] shadow-[inset_0_0_8px_rgba(0,0,0,0.8)]' : ''
             ]"
           >
             <div v-if="cell.terrain === 'tile'" class="absolute inset-0 opacity-40" style="background-image: linear-gradient(#a8a29e 1px, transparent 1px), linear-gradient(90deg, #a8a29e 1px, transparent 1px); background-size: 12px 12px;"></div>
@@ -153,6 +157,8 @@ watch(() => props.grid.length + (props.grid[0]?.length||0), () => {
             <div v-if="cell.terrain === 'marble'" class="absolute inset-0 opacity-25" style="background: radial-gradient(ellipse at 20% 30%, #a8a29e 1px, transparent 1px), radial-gradient(ellipse at 70% 60%, #d6d3d1 1px, transparent 1px); background-size: 18px 18px;"></div>
             <div v-if="cell.terrain === 'stone'" class="absolute inset-0 opacity-30" style="background-image: linear-gradient(#57534e 1px, transparent 1px), linear-gradient(90deg, #57534e 1px, transparent 1px); background-size: 10px 10px;"></div>
             <div v-if="cell.terrain === 'rubble'" class="absolute inset-0 opacity-50" style="background-image: radial-gradient(circle at 30% 30%, #44403c 2px, transparent 2px), radial-gradient(circle at 70% 60%, #292524 1.5px, transparent 1.5px), linear-gradient(45deg, transparent 48%, #1c1917 49%, #1c1917 51%, transparent 52%); background-size: 10px 10px, 14px 14px, 6px 6px;"></div>
+            <div v-if="cell.terrain === 'scorched'" class="absolute inset-0 opacity-70" style="background-image: radial-gradient(circle at 25% 25%, #292524 2px, transparent 2px), radial-gradient(circle at 75% 65%, #1c1917 2px, transparent 2px), radial-gradient(circle at 50% 50%, #44403c 1px, transparent 1px); background-size: 9px 9px, 13px 13px, 7px 7px; filter: brightness(0.6) contrast(1.2);"></div>
+            <div v-if="cell.terrain === 'scorched'" class="absolute inset-0 opacity-20" style="background: radial-gradient(ellipse at 50% 50%, rgba(251,146,60,0.18) 0%, transparent 70%);"></div>
             <div v-if="cell.terrain === 'water' || cell.terrain === 'deep_water'" class="absolute inset-0 opacity-30" style="background: radial-gradient(ellipse at 35% 25%, rgba(255,255,255,0.35) 0%, transparent 45%);"></div>
           </div>
 
@@ -174,7 +180,7 @@ watch(() => props.grid.length + (props.grid[0]?.length||0), () => {
       </template>
     </div>
 
-    <!-- Viñeta profundidad -->
-    <div class="absolute inset-0 pointer-events-none shadow-[inset_0_0_90px_rgba(0,0,0,0.32),inset_0_0_20px_rgba(0,0,0,0.18)]"></div>
+    <!-- Viñeta profundidad — desactivada en ahorro -->
+    <div v-if="perf.preset.value.shadows" class="absolute inset-0 pointer-events-none shadow-[inset_0_0_90px_rgba(0,0,0,0.32),inset_0_0_20px_rgba(0,0,0,0.18)]"></div>
   </div>
 </template>

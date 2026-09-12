@@ -1,6 +1,8 @@
 import { useCityStore } from '@/stores/cityStore.js'
 import { useTrafficStore } from '@/stores/trafficStore.js'
 import { BUILDING_TYPES } from '@/constants/buildings.js'
+import { PERFORMANCE_PRESETS } from '@/config/performance.js'
+import { usePerformance } from '@/composables/usePerformance.js'
 
 function findRoadNear(city, ox, oy, w = 1, h = 1) {
   // busca carretera en anillo alrededor del edificio
@@ -28,8 +30,24 @@ export function useServiceSpawns(opts = {}) {
   const city = useCityStore()
   const traffic = useTrafficStore()
   let timer = null
+  // performance caps
+  let perfRef = null
+  try { perfRef = usePerformance() } catch {}
+
+  function getCaps() {
+    try {
+      const p = perfRef ? perfRef.preset.value : PERFORMANCE_PRESETS.medium
+      return p
+    } catch { return PERFORMANCE_PRESETS.medium }
+  }
 
   function tick() {
+    const caps = getCaps()
+    // si ya hay demasiadas entidades, no spawnear más (ahorro móvil)
+    const totalPeds = traffic.pedestrians.length
+    const totalVehs = traffic.vehicles.length
+    const canSpawnPed = totalPeds < caps.maxPedestrians
+    const canSpawnVeh = totalVehs < caps.maxVehicles
     // solo en modo libre playing — el caller verifica appState
     const policeOrigins = city.flatGrid.filter(c => c.isOrigin && c.buildingId === 'police_station')
     const hospitalOrigins = city.flatGrid.filter(c => c.isOrigin && c.buildingId === 'hospital')
@@ -48,10 +66,10 @@ export function useServiceSpawns(opts = {}) {
       const maxCars = Math.min(8, policeOrigins.length * 2 + 1)
       const maxPeds = Math.min(10, policeOrigins.length * 3)
 
-      if (policePeds < maxPeds && Math.random() < 0.22) {
+      if (canSpawnPed && policePeds < maxPeds && Math.random() < 0.22) {
         traffic.addPedestrian(road.x, road.y, 'police')
       }
-      if (policeCars < maxCars && Math.random() < 0.14) {
+      if (canSpawnVeh && policeCars < maxCars && Math.random() < 0.14) {
         traffic.addVehicle(road.x, road.y, 'police_car')
       }
     }
@@ -68,10 +86,10 @@ export function useServiceSpawns(opts = {}) {
       const maxAmb = Math.min(6, hospitalOrigins.length * 2)
       const maxMed = Math.min(8, hospitalOrigins.length * 3)
 
-      if (medics < maxMed && Math.random() < 0.20) {
+      if (canSpawnPed && medics < maxMed && Math.random() < 0.20) {
         traffic.addPedestrian(road.x, road.y, 'medic')
       }
-      if (ambulances < maxAmb && Math.random() < 0.10) {
+      if (canSpawnVeh && ambulances < maxAmb && Math.random() < 0.10) {
         traffic.addVehicle(road.x, road.y, 'ambulance')
       }
     }
@@ -84,10 +102,10 @@ export function useServiceSpawns(opts = {}) {
       if (!road) continue
       const fireTrucks = traffic.vehicles.filter(v => v.type === 'fire_truck').length
       const firemen = traffic.pedestrians.filter(p => p.kind === 'fireman').length
-      if (firemen < fireOrigins.length * 2 && Math.random() < 0.15) {
+      if (canSpawnPed && firemen < fireOrigins.length * 2 && Math.random() < 0.15) {
         traffic.addPedestrian(road.x, road.y, 'fireman')
       }
-      if (fireTrucks < fireOrigins.length * 1 && Math.random() < 0.08) {
+      if (canSpawnVeh && fireTrucks < fireOrigins.length * 1 && Math.random() < 0.08) {
         traffic.addVehicle(road.x, road.y, 'fire_truck')
       }
     }
@@ -100,7 +118,7 @@ export function useServiceSpawns(opts = {}) {
       if (!road) continue
       const criminals = traffic.pedestrians.filter(p => p.kind === 'criminal').length
       const maxCrim = Math.min(9, prisonOrigins.length * 3)
-      if (criminals < maxCrim && Math.random() < 0.18) {
+      if (canSpawnPed && criminals < maxCrim && Math.random() < 0.18) {
         traffic.addPedestrian(road.x, road.y, 'criminal')
       }
     }
@@ -113,7 +131,7 @@ export function useServiceSpawns(opts = {}) {
       if (!road) continue
       const students = traffic.pedestrians.filter(p => p.kind === 'student').length
       const maxStu = Math.min(10, schoolOrigins.length * 4)
-      if (students < maxStu && Math.random() < 0.24) {
+      if (canSpawnPed && students < maxStu && Math.random() < 0.24) {
         traffic.addPedestrian(road.x, road.y, 'student')
       }
     }
@@ -126,7 +144,7 @@ export function useServiceSpawns(opts = {}) {
       if (!road) continue
       const uni = traffic.pedestrians.filter(p => p.kind === 'uni_student').length
       const maxUni = Math.min(10, uniOrigins.length * 4)
-      if (uni < maxUni && Math.random() < 0.22) {
+      if (canSpawnPed && uni < maxUni && Math.random() < 0.22) {
         traffic.addPedestrian(road.x, road.y, 'uni_student')
       }
     }
@@ -141,8 +159,8 @@ export function useServiceSpawns(opts = {}) {
       const judges = traffic.pedestrians.filter(p => p.kind === 'judge').length
       const maxLaw = Math.min(6, courtOrigins.length * 2)
       const maxJud = Math.min(4, courtOrigins.length * 1)
-      if (lawyers < maxLaw && Math.random() < 0.18) traffic.addPedestrian(road.x, road.y, 'lawyer')
-      if (judges < maxJud && Math.random() < 0.10) traffic.addPedestrian(road.x, road.y, 'judge')
+      if (canSpawnPed && lawyers < maxLaw && Math.random() < 0.18) traffic.addPedestrian(road.x, road.y, 'lawyer')
+      if (canSpawnPed && judges < maxJud && Math.random() < 0.10) traffic.addPedestrian(road.x, road.y, 'judge')
     }
 
     // terminal buses → spawnea buses en pavimento
@@ -153,7 +171,7 @@ export function useServiceSpawns(opts = {}) {
       if (!road) continue
       const buses = traffic.vehicles.filter(v => v.type === 'bus').length
       const maxBus = Math.min(8, busOrigins.length * 3)
-      if (buses < maxBus && Math.random() < 0.20) traffic.addVehicle(road.x, road.y, 'bus')
+      if (canSpawnVeh && buses < maxBus && Math.random() < 0.20) traffic.addVehicle(road.x, road.y, 'bus')
     }
 
     // concesionaria autos → spawnea autos
@@ -164,7 +182,7 @@ export function useServiceSpawns(opts = {}) {
       if (!road) continue
       const cars = traffic.vehicles.filter(v => v.type === 'car').length
       const maxCar = Math.min(10, carDealOrigins.length * 4)
-      if (cars < maxCar && Math.random() < 0.26) traffic.addVehicle(road.x, road.y, 'car')
+      if (canSpawnVeh && cars < maxCar && Math.random() < 0.26) traffic.addVehicle(road.x, road.y, 'car')
     }
 
     // concesionaria motos → ciudadano en moto (moto con piloto)
@@ -175,7 +193,7 @@ export function useServiceSpawns(opts = {}) {
       if (!road) continue
       const motos = traffic.vehicles.filter(v => v.type === 'moto').length
       const maxMoto = Math.min(8, motoDealOrigins.length * 3)
-      if (motos < maxMoto && Math.random() < 0.28) {
+      if (canSpawnVeh && motos < maxMoto && Math.random() < 0.28) {
         traffic.addVehicle(road.x, road.y, 'moto')
         // a veces también peatón moto cercano para efecto ciudadano montando
         if (Math.random() < 0.35) traffic.addPedestrian(road.x, road.y, 'man')
@@ -183,7 +201,7 @@ export function useServiceSpawns(opts = {}) {
     }
 
     // accidentes aleatorios de peatones/ciudadanos — 6% por tick si hay peatones
-    if (traffic.pedestrians.length >= 6 && traffic.accidents.length < 3 && Math.random() < 0.06) {
+    if (traffic.pedestrians.length >= 6 && traffic.accidents.length < caps.maxAccidents && Math.random() < 0.06) {
       // elige peatón civil al azar para accidentarse cerca de carretera
       const civilians = traffic.pedestrians.filter(p => !['police','medic','fireman','criminal','student','uni_student','lawyer','judge'].includes(p.kind) && !p.injured)
       if (civilians.length > 0) {
@@ -206,7 +224,7 @@ export function useServiceSpawns(opts = {}) {
     const airportOrigins = city.flatGrid.filter(c => c.isOrigin && (c.buildingId==='airport' || c.buildingId==='intl_airport'))
     for (const o of airportOrigins) {
       const b = BUILDING_TYPES[o.buildingId]
-      if (traffic.airportPlanes.length >= 4) continue
+      if (traffic.airportPlanes.length >= caps.maxPlanes) continue
       if (Math.random() < 0.18) {
         const type = Math.random() < 0.5 ? 'landing' : 'takeoff'
         traffic.addAirportPlane(o.x, o.y, b.width, b.height, type)
@@ -225,9 +243,9 @@ export function useServiceSpawns(opts = {}) {
       const maxSold = Math.min(10, milOrigins.length * 4)
       const maxJeep = Math.min(6, milOrigins.length * 2)
       const maxTank = Math.min(3, milOrigins.length * 1)
-      if (soldiers < maxSold && Math.random() < 0.26) traffic.addPedestrian(road.x, road.y, 'soldier')
-      if (jeeps < maxJeep && Math.random() < 0.16) traffic.addVehicle(road.x, road.y, 'army_jeep')
-      if (tanks < maxTank && Math.random() < 0.08) traffic.addVehicle(road.x, road.y, 'tank')
+      if (canSpawnPed && soldiers < maxSold && Math.random() < 0.26) traffic.addPedestrian(road.x, road.y, 'soldier')
+      if (canSpawnVeh && jeeps < maxJeep && Math.random() < 0.16) traffic.addVehicle(road.x, road.y, 'army_jeep')
+      if (canSpawnVeh && tanks < maxTank && Math.random() < 0.08) traffic.addVehicle(road.x, road.y, 'tank')
     }
 
     // arsenal → tractores → cañones de guerra
@@ -240,14 +258,15 @@ export function useServiceSpawns(opts = {}) {
       const cannons = traffic.vehicles.filter(v => v.type==='cannon').length
       const maxTrac = Math.min(6, arsenalOrigins.length * 3)
       const maxCan = Math.min(4, arsenalOrigins.length * 2)
-      if (tractors < maxTrac && Math.random() < 0.22) traffic.addVehicle(road.x, road.y, 'tractor')
-      if (cannons < maxCan && Math.random() < 0.12) traffic.addVehicle(road.x, road.y, 'cannon')
+      if (canSpawnVeh && tractors < maxTrac && Math.random() < 0.22) traffic.addVehicle(road.x, road.y, 'tractor')
+      if (canSpawnVeh && cannons < maxCan && Math.random() < 0.12) traffic.addVehicle(road.x, road.y, 'cannon')
     }
   }
 
-  function start(interval = 9000) {
+  function start(interval = null) {
     if (timer) clearInterval(timer)
-    timer = setInterval(tick, interval)
+    const ms = interval ?? getCaps().serviceSpawnMs ?? 9000
+    timer = setInterval(tick, ms)
     // primer tick rápido a los 4s si hay estaciones
     setTimeout(tick, 4000)
   }

@@ -36,6 +36,9 @@ import { useVictory } from '@/composables/useVictory.js'
 import { supabase } from '@/lib/supabase.js'
 import { useMultiplayerSync } from '@/composables/useMultiplayerSync.js'
 import { useKeepAlive } from '@/composables/useKeepAlive.js'
+import AtomicFlash from '@/components/AtomicFlash.vue'
+import MiniMap from '@/components/MiniMap.vue'
+import CharacterSelect from '@/components/CharacterSelect.vue'
 import { APP_URL } from '@/config.js'
 
 const city = useCityStore()
@@ -65,9 +68,19 @@ const showVictory = ref(false)
 const victoryData = ref(null)
 const showAuth = ref(false)
 const pendingMulti = ref(false)
+const isLogged = ref(false)
+const showCharacterSelect = ref(false)
+const pendingMode = ref(null)
+supabase.auth.getSession().then(({data})=> isLogged.value=!!data.session)
+supabase.auth.onAuthStateChange((_e,sess)=> isLogged.value=!!sess)
+async function doLogout(){ await supabase.auth.signOut(); isLogged.value=false }
 const chatMessages = ref([])
 const multiSync = useMultiplayerSync()
-function onAuthenticated() { showAuth.value=false; if(pendingMulti.value){ pendingMulti.value=false; handleMenuSelect('multi') } }
+function onAuthenticated() { showAuth.value=false; isLogged.value=true; if(pendingMulti.value){ pendingMulti.value=false; handleMenuSelect('multi') } }
+const atomicTrigger = ref(0)
+const atomicHeavy = ref(false)
+const atomicAlarm = ref(null)
+let alarmTimer = null
 const botPhrases = ['Construyendo…','Avanzando con cautela','Reforzando defensas','En camino','Posicionando unidades','Ajustando estrategia']
 function sendChat(text) {
   chatMessages.value.push({ id: Date.now() + Math.random(), sender: 'Tú', text, time: new Date().toLocaleTimeString() })
@@ -176,7 +189,6 @@ function handleMenuSelect(mode) {
     appState.value = 'loading'
     setTimeout(() => { appState.value = 'worlds' }, 700)
   } else if (mode === 'single') {
-    // Un jugador offline vs CPU — sin Supabase
     appState.value = 'singleSetup'
     return
   } else if (mode === 'multi') {
@@ -185,6 +197,15 @@ function handleMenuSelect(mode) {
       appState.value = 'multiLobby'
     })
   }
+}
+function handleCharacterSelect(id) {
+  showCharacterSelect.value = false
+}
+function handleCharacterClose() {
+  showCharacterSelect.value = false
+}
+function openMenuCharacterSelect() {
+  showCharacterSelect.value = true
 }
 
 function handleSingleStart() {
@@ -295,8 +316,36 @@ watch(() => [city.money, city.tickCount], () => {
   }, 800)
 })
 
-onMounted(() => {
+onMounted(async () => {
   keepAlive.start()
+  window.addEventListener('atomic-flash', (e) => {
+    atomicHeavy.value = !!e.detail?.heavy
+    try { window.__atomicFlashHeavy = !!e.detail?.heavy } catch {}
+    atomicTrigger.value = Date.now()
+    try { audioMgr.init(); if (e.detail?.heavy) { audioMgr.effects.playBomb(); audioMgr.effects.playExplosion() } else { audioMgr.effects.playBomb() } } catch {}
+  })
+  window.addEventListener('atomic-alarm', (e) => {
+    const heavy = !!e.detail?.heavy
+    atomicAlarm.value = { heavy, until: Date.now() + (heavy ? 11000 : 8000) }
+    clearTimeout(alarmTimer)
+    alarmTimer = setTimeout(() => atomicAlarm.value = null, heavy ? 11000 : 8000)
+    try { audioMgr.init(); audioMgr.effects.playAtomicAlarm(heavy, heavy ? 11000 : 8000) } catch {}
+    city.logs.unshift(heavy ? `🚨 ALARMA ATÓMICA PESADA — otras ciudades en alerta 11s` : `🚨 Alarma atómica — otras ciudades en alerta 8s`)
+  })
+  window.addEventListener('open-character-select', () => { showCharacterSelect.value = true; pendingMode.value = null })
+  // OTA auto-update para APK offline-first: si hay internet, baja update y aplica al reiniciar
+  try {
+    const { useAutoUpdater } = await import('@/composables/useAutoUpdater.js')
+    const updater = useAutoUpdater()
+    updater.listenOnline()
+    // chequea al iniciar si hay internet
+    if (navigator.onLine) setTimeout(() => updater.checkAndUpdate(), 2500)
+    // re-chequea cada vez que vuelve a foreground
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && navigator.onLine) updater.checkAndUpdate()
+    })
+    window.__jandocityUpdater = updater
+  } catch {}
   // Splash 2s
   setTimeout(() => { appState.value = 'menu' }, 2000)
 
@@ -400,6 +449,15 @@ onUnmounted(() => {
 
       <!-- Victoria / Derrota -->
       <VictoryOverlay :show="showVictory" :isWin="victoryData?.isWin" :winner="victoryData?.winner" :metrics="victoryData?.metrics" @menu="closeVictory(true)" @rematch="closeVictory(false)" />
+      <AtomicFlash :trigger="atomicTrigger" :heavy="atomicHeavy" />
+      <Transition name="fade">
+        <div v-if="atomicAlarm && appState==='playing'" class="fixed top-[44px] inset-x-0 z-[70] flex justify-center pointer-events-none">
+          <div class="px-4 py-2 rounded-full border-2 font-black text-xs tracking-widest shadow-[0_4px_16px_rgba(0,0,0,0.5)] flex items-center gap-2 animate-pulse" :class="atomicAlarm.heavy ? 'bg-orange-600 border-orange-300 text-white' : 'bg-red-600 border-red-300 text-white'">
+            <span>{{ atomicAlarm.heavy ? '💥' : '☢️' }}</span> {{ atomicAlarm.heavy ? 'ALARMA ATÓMICA PESADA — OTRAS CIUDADES' : 'ALARMA ATÓMICA — OTRAS CIUDADES' }} <span class="font-mono text-[10px] bg-black/20 px-1.5 py-0.5 rounded">{{ Math.max(0, Math.ceil((atomicAlarm.until - Date.now())/1000)) }}s</span>
+          </div>
+        </div>
+      </Transition>
+      <MiniMap :show="!!city.pendingRemoteWeapon && appState==='playing'" :targeting="true" @close="city.pendingRemoteWeapon=null" @cancelTargeting="city.pendingRemoteWeapon=null" @strike="city.pendingRemoteWeapon=null" />
 
       <Transition name="fade">
         <div v-show="showUI" class="hidden md:flex absolute bottom-3 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
@@ -418,6 +476,15 @@ onUnmounted(() => {
     </template>
     <!-- Auth multijugador (fuera de la cadena v-if) -->
     <AuthModal :show="showAuth" @close="showAuth=false" @authenticated="onAuthenticated" />
+    <CharacterSelect :show="showCharacterSelect" @select="handleCharacterSelect" @close="handleCharacterClose" />
+    <div v-if="appState==='menu'" class="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2">
+      <button @click="openMenuCharacterSelect" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur border border-white/15 text-[11px] text-white hover:bg-white/15">
+        <span class="text-sm">{{ player.character && player.character.icon ? player.character.icon : '👤' }}</span> {{ player.character && player.character.label ? player.character.label : 'Protagonista' }} • cambiar
+      </button>
+    </div>
+    <div v-if="appState==='menu' && isLogged" class="absolute top-2 right-2 z-30">
+      <button @click="doLogout" class="px-2.5 py-1 rounded-full bg-black/60 border border-white/15 text-[11px] text-white">Salir</button>
+    </div>
   </div>
 </template>
 

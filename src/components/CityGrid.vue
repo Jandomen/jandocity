@@ -20,6 +20,7 @@ import { BUILDINGS } from '@/constants/buildings.js'
 import VehicleLayer from './VehicleLayer.vue'
 import AirportPlaneLayer from './AirportPlaneLayer.vue'
 import { useAudioManager } from '@/audio/audioManager.js'
+import { usePerformance } from '@/composables/usePerformance.js'
 import { watch } from 'vue'
 
 const props = defineProps({
@@ -36,6 +37,7 @@ const buildQueue = useBuildQueue()
 const unitQueue = useUnitQueue()
 const selection = useSelection()
 const audioMgr = useAudioManager()
+const perf = usePerformance()
 const filteredBuildQueue = computed(() => (buildQueue.queue.value || []).filter(q=>!isNaN(q.progress) && q.progress!==undefined))
 const filteredUnitQueue = computed(() => (unitQueue.queue.value || []).filter(q=>!isNaN(q.progress) && q.progress!==undefined))
 const gridSize = computed(() => city.gridSize || 20)
@@ -114,15 +116,15 @@ const visibleRange = computed(() => {
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1920
   const vh = typeof window !== 'undefined' ? window.innerHeight : 1080
   const s = camera.scale.value
-  // Coordenadas locales (dentro del contenedor) visibles — no hay que restar ox/oy porque el contenedor ya está en coords locales
+  const overscan = perf.preset.value.visibleOverscan ?? 2
   const localLeft = (-camera.x.value) / s
   const localTop = (-camera.y.value) / s
   const localRight = (vw - camera.x.value) / s
   const localBottom = (vh - camera.y.value) / s
-  const startX = Math.max(0, Math.floor(localLeft / 48) - 2)
-  const endX = Math.min(gridWidth.value, Math.ceil(localRight / 48) + 2)
-  const startY = Math.max(0, Math.floor(localTop / 48) - 2)
-  const endY = Math.min(gridHeight.value, Math.ceil(localBottom / 48) + 2)
+  const startX = Math.max(0, Math.floor(localLeft / 48) - overscan)
+  const endX = Math.min(gridWidth.value, Math.ceil(localRight / 48) + overscan)
+  const startY = Math.max(0, Math.floor(localTop / 48) - overscan)
+  const endY = Math.min(gridHeight.value, Math.ceil(localBottom / 48) + overscan)
   return { startX, endX, startY, endY }
 })
 
@@ -168,10 +170,19 @@ function toggleQuadrant(qx, qy) {
 
 let buildTick = null
 let selTick = null
+function startTicks() {
+  if (buildTick) clearInterval(buildTick)
+  if (selTick) clearInterval(selTick)
+  const bMs = perf.preset.value.buildTickMs ?? 100
+  const sMs = perf.preset.value.selectionTickMs ?? 420
+  buildTick = setInterval(() => { if (single.isActive) { buildQueue.tick(bMs); unitQueue.tick(bMs) } }, bMs)
+  selTick = setInterval(() => { if (single.isActive) selection.tick() }, sMs)
+}
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
-  buildTick = setInterval(() => { if (single.isActive) { buildQueue.tick(100); unitQueue.tick(100) } }, 100)
-  selTick = setInterval(() => { if (single.isActive) selection.tick() }, 420)
+  startTicks()
+  // re-evaluar al cambiar calidad
+  watch(() => perf.effectiveQuality.value, startTicks)
 })
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown)
@@ -270,15 +281,16 @@ function handleCellClick(cell) {
     if (!res.ok && res.reason) showAviso(res.reason)
     return
   }
-  if (['car','pickup','moto','trailer','bus','train'].includes(city.selectedTool)) {
+  if (['car','pickup','moto','trailer','bus','train','boat_small','patrol_boat','cargo_ship'].includes(city.selectedTool)) {
     const isTrain = city.selectedTool === 'train'
+    const isBoat = ['boat_small','patrol_boat','cargo_ship'].includes(city.selectedTool)
     const res = traffic.addVehicle(cell.x, cell.y, city.selectedTool)
-    if (!res.ok) showAviso(isTrain ? 'Tren solo sobre rieles 🛤️' : res.reason)
+    if (!res.ok) showAviso(isTrain ? 'Tren solo sobre rieles 🛤️' : isBoat ? 'Solo sobre agua' : res.reason)
     else {
-      const cost = {car:25,pickup:35,moto:18,trailer:45,bus:40,train:50}[city.selectedTool]||25
+      const cost = {car:25,pickup:35,moto:18,trailer:45,bus:40,train:50,boat_small:40,patrol_boat:80,cargo_ship:180}[city.selectedTool]||25
       if (city.money >= cost) {
         city.money -= cost
-        showAviso(`${city.selectedTool} colocado y circula solo ${isTrain ? '🛤️' : '🛣️'}`)
+        showAviso(`${city.selectedTool} colocado y navega solo ${isTrain ? '🛤️' : isBoat ? '🌊' : '🛣️'}`)
       } else showAviso('Fondos insuficientes')
     }
     return
@@ -363,9 +375,9 @@ function handleCellEnter(cell) {
 </script>
 
 <template>
-  <!-- Viewport principal único w-full h-full — sin bordes oscuros, fusión limpia -->
+  <!-- Viewport principal único w-full h-full — fondo oscuro estrellado -->
   <main
-    class="absolute inset-0 w-full h-full overflow-hidden bg-[#22c55e] touch-none select-none m-0 p-0"
+    class="absolute inset-0 w-full h-full overflow-hidden bg-[#0a0f1e] touch-none select-none m-0 p-0"
     @pointerdown="handlePointerDown"
     @pointermove="handlePointerMove"
     @pointerup="handlePointerUp"
@@ -373,9 +385,11 @@ function handleCellEnter(cell) {
     @wheel.prevent="camera.onWheel"
     @contextmenu.prevent
   >
-    <!-- Contenedor con dimensiones fijas 48×GRID — crece hacia afuera sin redimensionar celdas, fusión invisible con #22c55e -->
+    <!-- Fondo estrellado -->
+    <div class="absolute inset-0 pointer-events-none" style="background: radial-gradient(1px 1px at 20% 30%, #fff 100%, transparent 100%), radial-gradient(1px 1px at 40% 70%, #fff 100%, transparent 100%), radial-gradient(1px 1px at 80% 20%, #fff 100%, transparent 100%), radial-gradient(1.2px 1.2px at 60% 50%, #fff 100%, transparent 100%), radial-gradient(1px 1px at 10% 80%, #fff 100%, transparent 100%), radial-gradient(0.8px 0.8px at 90% 90%, #fff 100%, transparent 100%); background-size: 280px 280px; opacity: 0.45;"></div>
+    <!-- Contenedor con dimensiones fijas 48×GRID — crece hacia afuera, matriz 150×150 -->
     <div
-      class="absolute top-0 left-0 will-change-transform bg-[#22c55e] m-0 p-0 border-0 shadow-none"
+      class="absolute top-0 left-0 will-change-transform bg-[#0a0f1e] m-0 p-0 border-0 shadow-none"
       :style="{ 
         transform: camera.transform.value,
         width: `${gridWidth * 48}px`,
@@ -499,7 +513,7 @@ function handleCellEnter(cell) {
     </Transition>
     <!-- Botones flotantes transparentes solo móvil/APK — izquierda (joystick va a la derecha) -->
     <div class="md:hidden absolute bottom-4 left-4 z-30 flex flex-col gap-2 pointer-events-auto">
-      <button @click="() => { audioMgr.init(); const next = audioMgr.music.next(); city.logs.unshift(`[Audio] ▶ ${audioMgr.music.tracks[next].label} (${audioMgr.music.tracks[next].mood})`); if(city.logs.length>50) city.logs.pop() }" class="w-10 h-10 rounded-full bg-black/30 backdrop-blur border border-white/20 text-white flex items-center justify-center text-[14px]" title="Cambiar música">🎵</button>
+      <button @click="() => { audioMgr.init(); if(audioMgr.music.isMuted) audioMgr.music.unmute(0.34); const next = audioMgr.music.next(); city.logs.unshift(`[Audio] ▶ ${audioMgr.music.tracks[next].label} (${audioMgr.music.tracks[next].mood})`); if(city.logs.length>50) city.logs.pop(); try{ (globalThis||window).dispatchEvent(new CustomEvent('track-toast', {detail: next})) }catch{} }" class="w-10 h-10 rounded-full bg-black/30 backdrop-blur border border-white/20 text-white flex items-center justify-center text-[14px]" title="Cambiar música">🎵</button>
       <button @click="() => { camera.scale.value = 1; const ox = city.offsetX ?? city.grid[0]?.[0]?.x ?? 0; const oy = city.offsetY ?? city.grid[0]?.[0]?.y ?? 0; const lx = (player.x - ox)*48+24; const ly = (player.y - oy)*48+24; camera.x.value = window.innerWidth/2 - lx*camera.scale.value; camera.y.value = window.innerHeight/2 - ly*camera.scale.value }" class="w-10 h-10 rounded-full bg-black/30 backdrop-blur border border-white/20 text-white flex items-center justify-center text-[14px]" title="Centrar 100%">⌖</button>
       <button @click="emit('openChat')" class="w-10 h-10 rounded-full bg-sky-600/50 backdrop-blur border border-white/20 text-white flex items-center justify-center text-[14px]" title="Chat (T)">💬</button>
       <button @click="emit('toggleUi')" class="w-10 h-10 rounded-full bg-black/30 backdrop-blur border border-white/20 text-white flex items-center justify-center text-[16px]" :class="props.showUi ? 'bg-black/30' : 'bg-emerald-600/50 border-emerald-400/50'" :title="props.showUi ? 'Ocultar menú' : 'Mostrar menú'">{{ props.showUi ? '🙈' : '👁️' }}</button>

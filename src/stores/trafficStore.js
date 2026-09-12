@@ -12,16 +12,20 @@ function isRoadCell(cell) {
 function isRailCell(cell) {
   return cell && (RAIL_IDS.includes(cell.buildingId) || cell.hasRail)
 }
+function isWaterCell(cell) {
+  return cell && (cell.terrain === 'water' || cell.terrain === 'deep_water' || cell.terrainType === 'water' || cell.terrainType === 'deep_water')
+}
 
 export const useTrafficStore = defineStore('traffic', () => {
   const vehicles = ref([]) // {id,x,y,dir,type,speed,hasPatient?}
   const pedestrians = ref([]) // {id,x,y,dir,kind,speed,injured?,escaping?}
   const trains = ref([])
+  const boats = ref([]) // {id,x,y,dir,type,speed, cargo[]}
   // accidentes visibles: {id,x,y, hasAmbulance?}
   const accidents = ref([])
   // aviones aeropuerto: {id, x,y, targetX,targetY, phase:'landing'|'takeoff', progress, airportX,airportY}
   const airportPlanes = ref([])
-  let vid = 1, pid = 1, tid = 1, aid = 1, apid = 1
+  let vid = 1, pid = 1, tid = 1, aid = 1, apid = 1, bid = 1
 
   function addVehicle(x, y, type = 'car', owner = null) {
     const city = useCityStore()
@@ -31,8 +35,13 @@ export const useTrafficStore = defineStore('traffic', () => {
       trains.value.push({ id: tid++, x, y, dir: 'right', type, speed: 520, owner })
       return { ok: true }
     }
+    if (['boat_small','patrol_boat','cargo_ship'].includes(type)) {
+      if (!cell || !isWaterCell(cell)) return { ok: false, reason: 'Solo sobre agua' }
+      boats.value.push({ id: bid++, x, y, dir: 'right', type, speed: type==='cargo_ship' ? 520 : 420, owner, hp: 100, cargo: [] })
+      return { ok: true }
+    }
     if (!cell || !isRoadCell(cell)) return { ok: false, reason: 'Solo sobre carretera' }
-    const speedMap = { moto: 320, trailer: 650, police_car: 400, ambulance: 380, fire_truck: 420, army_jeep: 380, tank: 520, tractor: 380, cannon: 480 }
+    const speedMap = { moto: 320, trailer: 650, police_car: 400, ambulance: 380, fire_truck: 420, army_jeep: 380, tank: 520, tractor: 380, cannon: 480, atomic: 480, atomic_heavy: 520, rocket: 400, missile: 420 }
     vehicles.value.push({ id: vid++, x, y, dir: 'right', type, speed: speedMap[type] || 480, owner, hp: 100, maxHp: 100 })
     return { ok: true }
   }
@@ -60,15 +69,19 @@ export const useTrafficStore = defineStore('traffic', () => {
       if (!found) return { ok: false, reason: 'Sin carretera cerca' }
       x = found.x; y = found.y
     }
+    // SWAT / francotirador = tropas a pie con mejor HP
+    const isService = ['police','medic','fireman','student','uni_student','lawyer','judge','soldier','swat','sniper'].includes(kind)
     // criminales armados aleatorios
     const criminalWeapons = ['knife','gun','unarmed']
-    const isService = ['police','medic','fireman','student','uni_student','lawyer','judge','soldier'].includes(kind)
     const weapon = kind === 'criminal' ? criminalWeapons[Math.floor(Math.random()*criminalWeapons.length)] : null
     // arma influye en riesgo y símbolo; gun = más letal, knife = cuerpo a cuerpo
     const isArmed = kind === 'criminal' && weapon !== 'unarmed'
     // peatones caminan despacio (1200-1600ms), servicio un poco menos lento, criminal corre si huye (550ms), se ajusta dinámico en tick
-    const baseSpeed = isService ? 1150 + Math.random()*250 : kind==='criminal' ? 950 + Math.random()*200 : 1250 + Math.random()*350
-    pedestrians.value.push({ id: pid++, x, y, dir: 'right', kind, weapon, isArmed, attackCooldown: 0, isRunning: false, speed: baseSpeed, baseSpeed, step: 0, owner, hp: 100, maxHp: 100, target: null })
+    // SWAT/sniper con stats especiales
+    const hpMap = { swat: 130, sniper: 90 }
+    const hp = hpMap[kind] || 100
+    const baseSpeed = kind==='swat' ? 620 + Math.random()*120 : kind==='sniper' ? 900 + Math.random()*180 : isService ? 1150 + Math.random()*250 : kind==='criminal' ? 950 + Math.random()*200 : 1250 + Math.random()*350
+    pedestrians.value.push({ id: pid++, x, y, dir: 'right', kind, weapon, isArmed, attackCooldown: 0, isRunning: false, speed: baseSpeed, baseSpeed, step: 0, owner, hp, maxHp: hp, target: null })
     return { ok: true }
   }
 
@@ -221,9 +234,9 @@ export const useTrafficStore = defineStore('traffic', () => {
       }
     }
 
-    // 1) Policía/soldado a pie y patrullas/ejército persiguen criminales más cercanos (radio 10)
+    // 1) Policía/soldado/SWAT/francotirador a pie y patrullas/ejército persiguen criminales más cercanos (radio 10)
     const criminals = pedestrians.value.filter(p => p.kind === 'criminal')
-    const polices = pedestrians.value.filter(p => p.kind === 'police' || p.kind === 'soldier')
+    const polices = pedestrians.value.filter(p => ['police','soldier','swat','sniper'].includes(p.kind))
     const policeCars = vehicles.value.filter(v => v.type === 'police_car' || v.type === 'army_jeep' || v.type === 'tank')
     const ambulances = vehicles.value.filter(v => v.type === 'ambulance')
     // accidentes activos
@@ -424,7 +437,7 @@ export const useTrafficStore = defineStore('traffic', () => {
 
     // Peatones heridos no se mueven, civiles normales sí (incluye criminales ya movidos arriba, evitamos doble)
     // civiles caminan despacio; si ven criminal a ≤3, corren despavoridos
-    const handledKinds = new Set(['police','soldier','criminal'])
+    const handledKinds = new Set(['police','soldier','swat','sniper','criminal'])
     for (const p of pedestrians.value) {
       if (p.target) continue
       if (handledKinds.has(p.kind)) continue
@@ -473,9 +486,46 @@ export const useTrafficStore = defineStore('traffic', () => {
       const step = randomStep(t, true)
       if (step) { t.x += step.dx; t.y += step.dy; t.dir = step.dir }
     }
+    // barcos: solo agua, automático
+    for (const b of boats.value) {
+      if (b.target) continue
+      // cargo: si es cargo y está junto a muelle con unidades del mismo dueño esperando, carga
+      if (b.type==='cargo_ship' && b.cargo.length < 6) {
+        const nearPeds = pedestrians.value.filter(p=>p.owner===b.owner && !p.injured && Math.abs(p.x-b.x)+Math.abs(p.y-b.y) <= 2)
+        if (nearPeds.length) {
+          const toLoad = nearPeds.slice(0, 6 - b.cargo.length)
+          for (const p of toLoad) {
+            const idx = pedestrians.value.findIndex(x=>x.id===p.id)
+            if (idx!==-1) { b.cargo.push(p); pedestrians.value.splice(idx,1) }
+          }
+        }
+      }
+      // si tiene cargo y está junto a muelle del otro lado, descarga
+      if (b.type==='cargo_ship' && b.cargo.length > 0) {
+        const city2 = useCityStore()
+        const nearDock = city2.flatGrid.some(c=> (c.buildingId==='dock' || c.buildingId==='pier') && Math.abs(c.x-b.x)+Math.abs(c.y-b.y) <= 2)
+        if (nearDock && Math.random()<0.08) {
+          for (const p of b.cargo.splice(0, b.cargo.length)) {
+            p.x = b.x; p.y = b.y
+            pedestrians.value.push(p)
+          }
+        }
+      }
+      const step = (() => {
+        const dirs = [{dx:1,dy:0,dir:'right'},{dx:-1,dy:0,dir:'left'},{dx:0,dy:-1,dir:'up'},{dx:0,dy:1,dir:'down'}]
+        const cands = []
+        for (const d of dirs) {
+          const cell = useCityStore().getCell(b.x+d.dx, b.y+d.dy)
+          if (isWaterCell(cell)) cands.push(d)
+        }
+        if (cands.length===0) return null
+        return cands[Math.floor(Math.random()*cands.length)]
+      })()
+      if (step) { b.x += step.dx; b.y += step.dy; b.dir = step.dir }
+    }
   }
 
-  function clear() { vehicles.value = []; pedestrians.value = []; trains.value = []; accidents.value = []; airportPlanes.value = [] }
+  function clear() { vehicles.value = []; pedestrians.value = []; trains.value = []; boats.value = []; accidents.value = []; airportPlanes.value = [] }
 
-  return { vehicles, pedestrians, trains, accidents, airportPlanes, addVehicle, addPedestrian, addAccident, addAirportPlane, tick, clear }
+  return { vehicles, pedestrians, trains, boats, accidents, airportPlanes, addVehicle, addPedestrian, addAccident, addAirportPlane, tick, clear }
 })

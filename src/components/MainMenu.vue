@@ -3,55 +3,55 @@ const emit = defineEmits(['select'])
 </script>
 
 <template>
-  <div class="absolute inset-0 z-30 flex flex-col items-center justify-center bg-[#0f172a] text-white overflow-hidden p-4">
-    <!-- Fondo -->
-    <div class="absolute inset-0 bg-gradient-to-b from-[#0f172a] via-[#1e293b] to-[#0f172a]"></div>
-    <div class="absolute inset-0 opacity-20" style="background: radial-gradient(ellipse at 50% 20%, rgba(56,189,248,0.2), transparent 60%);"></div>
+  <div class="absolute inset-0 z-30 flex flex-col bg-[#0a0f1e] text-white overflow-auto p-4 py-6">
+    <!-- Fondo juego: grid + vignette -->
+    <div class="absolute inset-0 bg-[#0a0f1e]"></div>
+    <div class="absolute inset-0 opacity-40" style="background-image: linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px); background-size: 28px 28px;"></div>
+    <div class="absolute inset-0" style="background: radial-gradient(ellipse at 50% 0%, rgba(56,189,248,0.18), transparent 60%), radial-gradient(ellipse at 50% 100%, rgba(16,185,129,0.12), transparent 50%);"></div>
 
-    <div class="relative w-full max-w-[420px] flex flex-col items-center gap-6">
-      <!-- Título -->
-      <div class="flex flex-col items-center gap-2">
-        <img src="/favicon.png" alt="Jandocity" class="w-14 h-14 rounded-xl shadow border border-white/20" />
-        <h1 class="font-black tracking-[0.2em] text-2xl md:text-3xl" style="font-family:'Cinzel','Righteous',serif; background: linear-gradient(180deg,#fde68a 0%,#f59e0b 55%,#92400e 100%); -webkit-background-clip:text; background-clip:text; color:transparent;">JANDOCITY</h1>
-        <p class="text-[11px] tracking-[0.3em] text-white/40 font-semibold">ELIGE UN MODO</p>
+    <div class="relative w-full max-w-[420px] flex flex-col items-center gap-5 mx-auto my-auto">
+      <!-- Placa título estilo juego -->
+      <div class="w-full bg-[#1e293b] border-[3px] border-[#334155] rounded-xl shadow-[0_8px_0_#0f172a,0_12px_24px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.15)] p-4 flex flex-col items-center gap-2">
+        <div class="w-16 h-16 rounded-xl bg-gradient-to-b from-[#fde68a] to-[#92400e] border-2 border-white/20 shadow flex items-center justify-center text-2xl">🏙️</div>
+        <h1 class="font-black tracking-[0.18em] text-2xl md:text-3xl" style="font-family:'Cinzel','Righteous',serif; color:#fde68a; text-shadow: 0 2px 0 #92400e, 0 4px 12px rgba(0,0,0,0.5);">JANDOCITY</h1>
+        <div class="w-full h-[2px] bg-[#334155] rounded-full overflow-hidden"><div class="h-full w-1/3 bg-[#38bdf8]"></div></div>
+        <p class="text-[10px] tracking-[0.32em] text-[#94a3b8] font-black">ELIGE UN MODO</p>
       </div>
 
-      <!-- Botones -->
+      <!-- Botones estilo madera/metal juego -->
       <div class="w-full flex flex-col gap-3">
-        <!-- Modo libre -->
-        <button @click="emit('select','free')" class="group w-full flex items-center gap-3 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white rounded-xl px-4 py-3.5 shadow-[0_8px_24px_rgba(0,0,0,0.4)] border border-white/10 transition-all">
-          <span class="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-lg">🌍</span>
+        <button @click="emit('select','free')" class="group w-full flex items-center gap-3 bg-[#14532d] hover:bg-[#15803d] active:translate-y-[2px] text-white rounded-xl px-4 py-3.5 shadow-[0_6px_0_#052e16,0_8px_16px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.15)] border-2 border-[#16a34a] transition-all">
+          <span class="w-11 h-11 rounded-lg bg-black/20 border-2 border-white/20 flex items-center justify-center text-xl shadow-inner">🌍</span>
           <div class="text-left flex-1">
-            <div class="font-black text-sm tracking-wide">Modo libre</div>
-            <div class="text-[11px] text-white/80 leading-none">Local • sin registro • mundos ilimitados</div>
+            <div class="font-black text-sm tracking-wide" style="text-shadow: 0 1px 0 #052e16;">MODO LIBRE</div>
+            <div class="text-[11px] text-white/80 leading-none">Mundos ilimitados • sin registro</div>
           </div>
-          <span class="text-white/60 group-hover:translate-x-0.5 transition-transform">›</span>
+          <span class="w-7 h-7 rounded-full bg-white text-[#14532d] flex items-center justify-center font-black text-sm group-active:scale-95">›</span>
         </button>
 
-        <!-- Un jugador -->
-        <button @click="emit('select','single')" class="w-full flex items-center gap-3 bg-sky-600 hover:bg-sky-500 active:scale-[0.98] text-white rounded-xl px-4 py-3.5 shadow border border-white/10 transition-all relative overflow-hidden">
-          <span class="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-lg">👤</span>
+        <button @click="emit('select','single')" class="group w-full flex items-center gap-3 bg-[#1e3a8a] hover:bg-[#1e40af] active:translate-y-[2px] text-white rounded-xl px-4 py-3.5 shadow-[0_6px_0_#1e1b4b,0_8px_16px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.15)] border-2 border-[#38bdf8] transition-all">
+          <span class="w-11 h-11 rounded-lg bg-black/20 border-2 border-white/20 flex items-center justify-center text-xl">👤</span>
           <div class="text-left flex-1">
-            <div class="font-bold text-sm">Un jugador</div>
-            <div class="text-[11px] text-white/80 leading-none">Offline vs CPU • 1vs1 / 2vs2 • colores</div>
+            <div class="font-black text-sm" style="text-shadow: 0 1px 0 #1e1b4b;">UN JUGADOR</div>
+            <div class="text-[11px] text-white/80 leading-none">Vs CPU • 1vs1 / 2vs2 • colores</div>
           </div>
-          <span class="text-white/60">›</span>
+          <span class="w-7 h-7 rounded-full bg-white text-[#1e3a8a] flex items-center justify-center font-black text-sm">›</span>
         </button>
 
-        <!-- Multijugador -->
-        <button @click="emit('select','multi')" class="w-full flex items-center gap-3 bg-violet-600 hover:bg-violet-500 active:scale-[0.98] text-white rounded-xl px-4 py-3.5 shadow border border-white/10 transition-all">
-          <span class="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-lg">⚔️</span>
+        <button @click="emit('select','multi')" class="group w-full flex items-center gap-3 bg-[#581c87] hover:bg-[#6b21a8] active:translate-y-[2px] text-white rounded-xl px-4 py-3.5 shadow-[0_6px_0_#3b0764,0_8px_16px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.15)] border-2 border-[#a78bfa] transition-all">
+          <span class="w-11 h-11 rounded-lg bg-black/20 border-2 border-white/20 flex items-center justify-center text-xl">⚔️</span>
           <div class="text-left flex-1">
-            <div class="font-bold text-sm">Multijugador</div>
-            <div class="text-[11px] text-white/80 leading-none">Hasta 8 • clave JND-XXXX • elimina al rival</div>
+            <div class="font-black text-sm" style="text-shadow: 0 1px 0 #3b0764;">MULTIJUGADOR</div>
+            <div class="text-[11px] text-white/80 leading-none">Hasta 8 • JND-XXXX</div>
           </div>
-          <span class="text-white/60">›</span>
+          <span class="w-7 h-7 rounded-full bg-white text-[#581c87] flex items-center justify-center font-black text-sm">›</span>
         </button>
       </div>
 
-      <p class="text-[10px] text-white/30 text-center leading-tight max-w-[320px]">
-        Modo libre y Un jugador en tu dispositivo.<br/>Multijugador en línea.
-      </p>
+      <div class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 flex items-center justify-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="text-[10px] text-white/60 font-mono">JANDOSOFT • v2.0</span>
+      </div>
     </div>
   </div>
 </template>

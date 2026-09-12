@@ -88,8 +88,8 @@ function pick(toolId) {
   <div class="md:hidden">
     <!-- Carrusel inferior — una sola línea, altura del antiguo "Presiona H" -->
     <Transition name="fade">
-      <div v-show="showUI" class="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
-        <div class="bg-black/70 backdrop-blur-md border border-white/10 rounded-full px-2 py-1.5 flex items-center gap-1 overflow-x-auto scrollbar-thin snap-x snap-mandatory max-w-[68vw] sm:max-w-[520px]">
+      <div v-show="showUI" class="absolute bottom-3 left-16 z-20 pointer-events-auto">
+        <div class="bg-black/70 backdrop-blur-md border border-white/10 rounded-full px-2 py-1.5 flex items-center gap-1 overflow-x-auto scrollbar-thin snap-x snap-mandatory max-w-[60vw] sm:max-w-[520px]">
           <button
             v-for="c in categories"
             :key="c.id"
@@ -114,7 +114,7 @@ function pick(toolId) {
               <span>{{ categories.find(x=>x.id===selected)?.icon }}</span>
               {{ categories.find(x=>x.id===selected)?.label }}
             </span>
-            <span class="text-[10px] text-white/50">{{ selected==='produccion' ? 'encola unidad' : 'toca un ítem para equipar' }}</span>
+            <span class="text-[10px] text-white/50">{{ selected==='produccion' ? 'Encola unidad' : 'Elige qué construir' }}</span>
           </div>
 
           <div class="flex-1 overflow-auto p-3 space-y-3">
@@ -142,6 +142,7 @@ function pick(toolId) {
               <div class="grid grid-cols-2 gap-1.5">
                 <button @click="unitQueue.enqueue('arsenal','tractor', single.humanPlayer()?.id||'p0')" class="p-2 rounded border flex flex-col items-center gap-0.5 bg-slate-800 border-slate-700 text-white/70"><span class="text-base">🚜</span><span class="text-[10px] font-semibold">Tractor</span><span class="text-[9px] font-mono">$50</span></button>
                 <button @click="unitQueue.enqueue('arsenal','cannon', single.humanPlayer()?.id||'p0')" class="p-2 rounded border flex flex-col items-center gap-0.5 bg-slate-800 border-slate-700 text-white/70"><span class="text-base">💣</span><span class="text-[10px] font-semibold">Cañón</span><span class="text-[9px] font-mono">$120</span></button>
+                <button @click="unitQueue.enqueue('arsenal','atomic', single.humanPlayer()?.id||'p0')" class="col-span-2 p-2 rounded border flex items-center justify-center gap-2 bg-amber-900/30 border-amber-500 text-amber-300"><span class="text-base">☢️</span><span class="text-[10px] font-semibold">Atómica</span><span class="text-[9px] font-mono">$500</span></button>
               </div>
               </template>
               <div v-if="unitQueue.queue.length" class="bg-slate-900 rounded border border-white/10 p-2 space-y-1">
@@ -455,6 +456,15 @@ function pick(toolId) {
                   <span class="text-base">{{ tool.icon }}</span><span class="text-[10px] font-semibold">{{ tool.label }}</span><span class="text-[8px] opacity-60">{{ tool.sub }}</span><span class="text-[9px] font-mono text-blue-400">${{ tool.cost }}</span>
                 </button>
               </div>
+              <div class="grid grid-cols-3 gap-1.5 border-t border-slate-700/30 mt-2 pt-2">
+                <button v-for="tool in [
+                  { id: 'boat_small', label: 'Lancha', icon: '⛵', cost: BUILDINGS.boat_small.cost, sub: 'solo agua' },
+                  { id: 'patrol_boat', label: 'Patrulla', icon: '🚤', cost: BUILDINGS.patrol_boat.cost, sub: 'solo agua' },
+                  { id: 'cargo_ship', label: 'Buque', icon: '🚢', cost: BUILDINGS.cargo_ship.cost, sub: 'lleva 6' },
+                ]" :key="tool.id" @click="pick(tool.id)" class="p-2 rounded border flex flex-col items-center gap-0.5" :class="city.selectedTool===tool.id ? 'bg-sky-500/20 border-sky-500 text-sky-300 ring-1 ring-sky-500' : 'bg-slate-800 border-slate-700 text-white/70'">
+                  <span class="text-base">{{ tool.icon }}</span><span class="text-[10px] font-semibold">{{ tool.label }}</span><span class="text-[8px] opacity-60">{{ tool.sub }}</span><span class="text-[9px] font-mono text-sky-400">${{ tool.cost }}</span>
+                </button>
+              </div>
             </template>
 
             <!-- NATURALEZA -->
@@ -487,7 +497,7 @@ function pick(toolId) {
           <!-- X inferior para cerrar -->
           <div class="shrink-0 p-3 border-t border-white/10 bg-slate-800/60">
             <button @click="close" class="w-full py-2.5 rounded-full bg-white text-slate-900 font-black text-sm hover:bg-slate-100 active:scale-[0.98]">✕ Cerrar</button>
-            <p class="text-center text-[10px] text-white/40 mt-1.5">Selecciona y toca el mapa para construir • arrastra para pintar</p>
+            <p class="text-center text-[10px] text-white/40 mt-1.5">Selecciona y toca el mapa para construir</p>
           </div>
         </div>
       </div>

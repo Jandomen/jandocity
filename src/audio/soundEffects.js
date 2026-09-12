@@ -127,6 +127,30 @@ export function createSoundEffects() {
       } else {
         blip(650, 0.22, 0.28, 'square', 200); setTimeout(()=>blip(850, 0.22, 0.26, 'square', -180), 220)
       }
+    },
+    playCannon() {
+      blip(60, 0.14, 0.38, 'sawtooth'); setTimeout(()=>blip(40, 0.22, 0.34, 'triangle'), 60); setTimeout(()=>blip(180, 0.08, 0.18, 'square'), 180)
+    },
+    playBomb() {
+      blip(45, 0.18, 0.40, 'sawtooth'); setTimeout(()=>blip(30, 0.28, 0.36, 'triangle'), 70); setTimeout(()=>{ blip(90, 0.12, 0.22, 'square'); blip(120, 0.10, 0.16, 'square') }, 140)
+    },
+    playExplosion() {
+      blip(35, 0.32, 0.42, 'sawtooth', -15); setTimeout(()=>blip(70, 0.18, 0.24, 'square'), 90)
+    },
+    playAtomicAlarm(heavy = false, durationMs = 9000) {
+      // alarma atómica solo para atómicas — suena un tiempo (no para cohetes)
+      const endAt = Date.now() + durationMs
+      const tick = () => {
+        if (Date.now() > endAt) return
+        // sirena grave wail, más grave y anaranjada para pesada
+        if (heavy) {
+          blip(220, 0.28, 0.30, 'sawtooth', 120); setTimeout(()=>blip(340, 0.28, 0.28, 'sawtooth', -90), 280)
+        } else {
+          blip(380, 0.22, 0.26, 'square', 180); setTimeout(()=>blip(520, 0.22, 0.24, 'square', -140), 260)
+        }
+        setTimeout(tick, heavy ? 620 : 560)
+      }
+      tick()
     }
   }
 }

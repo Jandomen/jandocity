@@ -4,10 +4,26 @@ import { useCityStore } from '@/stores/cityStore.js'
 import { useSinglePlayerStore } from '@/stores/singlePlayerStore.js'
 import { useUnitQueue } from '@/composables/useUnitQueue.js'
 import { BUILDINGS } from '@/constants/buildings.js'
+import { WEAPONS } from '@/config/weapons.js'
 
 const city = useCityStore()
 const single = useSinglePlayerStore()
 const unitQueue = useUnitQueue()
+
+function triggerRemote(weaponId) {
+  const w = WEAPONS.find(x=>x.id===weaponId)
+  if (!w) return
+  const cost = w.priceMX
+  // cheapest check: city.money may be number
+  if (city.money < cost) {
+    city.logs.unshift(`[Remoto] Fondos insuficientes para ${w.label} (${cost}💰)`)
+    return
+  }
+  city.pendingRemoteWeapon = weaponId
+  city.logs.unshift(`[Remoto] ${w.icon} ${w.label} listo — abre el mapa y toca dónde atacar`)
+}
+
+const remoteWeapons = computed(() => WEAPONS.filter(w=>w.remote))
 
 const hasPolice = computed(() => city.flatGrid.some(c=>c.isOrigin && c.buildingId==='police_station' && c.owner===single.humanPlayer()?.id))
 const hasMil = computed(() => city.flatGrid.some(c=>c.isOrigin && c.buildingId==='military_academy' && c.owner===single.humanPlayer()?.id))
@@ -27,6 +43,7 @@ const open = ref({
   servicios: true,
   publica: true,
   produccion: true,
+  remoto: true,
   cultura: true,
   mundial: true,
   banderas: true,
@@ -276,10 +293,13 @@ function btnBase(selected, color) {
       <div v-show="open.produccion" class="p-2 space-y-2">
         <div v-if="!hasPolice && !hasMil && !hasArs" class="text-[11px] text-white/40 text-center py-2">Construye Comisaría, Colegio Militar o Arsenal para desbloquear producción</div>
         <template v-if="hasPolice">
-        <div class="text-[10px] font-bold text-sky-400">Comisaría → Policías</div>
+        <div class="text-[10px] font-bold text-sky-400">Comisaría → Policías / SWAT (a pie)</div>
         <div class="grid grid-cols-2 gap-1.5">
           <button @click="unitQueue.enqueue('police_station','police', single.humanPlayer()?.id || 'p0')" class="p-2 rounded border flex flex-col items-center gap-0.5 bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700">
             <span class="text-base">👮</span><span class="text-[10px] font-semibold">Policía</span><span class="text-[9px] font-mono">$30 · 2.8s</span>
+          </button>
+          <button @click="unitQueue.enqueue('police_station','swat', single.humanPlayer()?.id || 'p0')" class="p-2 rounded border flex flex-col items-center gap-0.5 bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700">
+            <span class="text-base">👮‍♂️</span><span class="text-[10px] font-semibold">SWAT</span><span class="text-[9px] font-mono">$80 · 3.2s</span>
           </button>
           <button @click="unitQueue.enqueue('police_station','police_car', single.humanPlayer()?.id || 'p0')" class="p-2 rounded border flex flex-col items-center gap-0.5 bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700">
             <span class="text-base">🚔</span><span class="text-[10px] font-semibold">Patrulla</span><span class="text-[9px] font-mono">$80 · 4s</span>
@@ -287,13 +307,16 @@ function btnBase(selected, color) {
         </div>
         </template>
         <template v-if="hasMil">
-        <div class="text-[10px] font-bold text-green-400">Colegio Militar → Soldados</div>
+        <div class="text-[10px] font-bold text-green-400">Colegio Militar → Soldados / Francotirador (a pie)</div>
         <div class="grid grid-cols-2 gap-1.5">
           <button @click="unitQueue.enqueue('military_academy','soldier', single.humanPlayer()?.id || 'p0')" class="p-2 rounded border flex flex-col items-center gap-0.5 bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700">
             <span class="text-base">🪖</span><span class="text-[10px] font-semibold">Soldado</span><span class="text-[9px] font-mono">$40 · 2.5s</span>
           </button>
           <button @click="unitQueue.enqueue('military_academy','soldier_heavy', single.humanPlayer()?.id || 'p0')" class="p-2 rounded border flex flex-col items-center gap-0.5 bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700">
             <span class="text-base">🎖️</span><span class="text-[10px] font-semibold">Pesado</span><span class="text-[9px] font-mono">$60 · 3.2s</span>
+          </button>
+          <button @click="unitQueue.enqueue('military_academy','sniper', single.humanPlayer()?.id || 'p0')" class="p-2 rounded border flex flex-col items-center gap-0.5 bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700">
+            <span class="text-base">🎯</span><span class="text-[10px] font-semibold">Francotirador</span><span class="text-[9px] font-mono">$95 · 3.6s</span>
           </button>
           <button @click="unitQueue.enqueue('military_academy','army_jeep', single.humanPlayer()?.id || 'p0')" class="p-2 rounded border flex flex-col items-center gap-0.5 bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700">
             <span class="text-base">🚙</span><span class="text-[10px] font-semibold">Jeep</span><span class="text-[9px] font-mono">$90 · 3.8s</span>
@@ -312,6 +335,9 @@ function btnBase(selected, color) {
           <button @click="unitQueue.enqueue('arsenal','cannon', single.humanPlayer()?.id || 'p0')" class="p-2 rounded border flex flex-col items-center gap-0.5 bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700">
             <span class="text-base">💣</span><span class="text-[10px] font-semibold">Cañón</span><span class="text-[9px] font-mono">$120 · 5.5s</span>
           </button>
+          <button @click="unitQueue.enqueue('arsenal','atomic', single.humanPlayer()?.id || 'p0')" class="col-span-2 p-2 rounded border flex items-center justify-center gap-2 bg-amber-900/30 border-amber-500 text-amber-300 hover:bg-amber-900/40">
+            <span class="text-base">☢️</span><span class="text-[10px] font-semibold">Bomba Atómica</span><span class="text-[9px] font-mono">$500 · 9s</span>
+          </button>
         </div>
         </template>
         <div v-if="unitQueue.queue.length" class="bg-slate-900 rounded border border-white/10 p-2 space-y-1">
@@ -322,7 +348,34 @@ function btnBase(selected, color) {
             <div class="w-16 h-1.5 bg-black/40 rounded-full overflow-hidden border border-white/10"><div class="h-full bg-sky-400" :style="{width: q.progress+'%'}"></div></div>
           </div>
         </div>
-        <p class="text-[10px] text-white/40 leading-tight">Requiere edificio construido junto a carretera. Cola máx 4 por edificio.</p>
+        <p class="text-[10px] text-white/40 leading-tight">SWAT y francotirador van a pie y atacan directo (no remoto). Requiere edificio junto a carretera. Cola máx 4 por edificio.</p>
+      </div>
+    </section>
+
+    <!-- ATAQUE REMOTO — abre mapa y eliges dónde cae -->
+    <section class="bg-slate-900/60 rounded-lg border border-red-700/50 overflow-hidden">
+      <button @click="toggle('remoto')" class="w-full flex items-center justify-between px-3 py-2 bg-red-900/30 hover:bg-red-900/40 transition-colors">
+        <span class="flex items-center gap-2 text-xs font-bold tracking-wider text-red-300"><span>🚀</span> ATAQUE REMOTO — vía mapa <span class="text-red-500/60 font-normal">4 armas</span></span>
+        <span class="text-red-300 text-xs">{{ open.remoto ? '−' : '+' }}</span>
+      </button>
+      <div v-show="open.remoto" class="p-2 space-y-2">
+        <p class="text-[10px] text-white/50 leading-tight">Se abre el mapa: tocas dónde atacar. {{ city.pendingRemoteWeapon ? `Seleccionado: ${WEAPONS.find(w=>w.id===city.pendingRemoteWeapon)?.label}` : 'Elige un arma' }}</p>
+        <div class="grid grid-cols-2 gap-1.5">
+          <button @click="triggerRemote('rocket')" class="p-2 rounded border flex flex-col items-center gap-0.5" :class="city.pendingRemoteWeapon==='rocket' ? 'bg-red-600 border-white text-white ring-1 ring-white' : 'bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700'">
+            <span class="text-base">🚀</span><span class="text-[10px] font-semibold">Cohete</span><span class="text-[9px] opacity-60">3x3 • $50</span>
+          </button>
+          <button @click="triggerRemote('missile')" class="p-2 rounded border flex flex-col items-center gap-0.5" :class="city.pendingRemoteWeapon==='missile' ? 'bg-red-600 border-white text-white ring-1 ring-white' : 'bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700'">
+            <span class="text-base">🚀</span><span class="text-[10px] font-semibold">Misil</span><span class="text-[9px] opacity-60">5x5 • $200</span>
+          </button>
+          <button @click="triggerRemote('atomic')" class="p-2 rounded border flex flex-col items-center gap-0.5" :class="city.pendingRemoteWeapon==='atomic' ? 'bg-amber-600 border-white text-white ring-1 ring-white' : 'bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700'">
+            <span class="text-base">☢️</span><span class="text-[10px] font-semibold">Atómica</span><span class="text-[9px] opacity-60">7x7 • $500</span>
+          </button>
+          <button @click="triggerRemote('atomic_heavy')" class="p-2 rounded border flex flex-col items-center gap-0.5" :class="city.pendingRemoteWeapon==='atomic_heavy' ? 'bg-zinc-800 border-amber-400 text-amber-300 ring-1 ring-amber-400' : 'bg-amber-900/30 border-amber-500 text-amber-300 hover:bg-amber-900/40'">
+            <span class="text-base">💥</span><span class="text-[10px] font-semibold">Atómica Pesada</span><span class="text-[9px] opacity-60">11x11 • $850</span>
+          </button>
+        </div>
+        <p class="text-[9px] text-white/40 leading-tight">Atómica pesada deja <b class="text-zinc-300">piso gris con escombros</b> (rubble) hasta que sale pasto: gris → tierra 12s → pasto 37s. Usa la lógica ya existente de demolición.</p>
+        <button v-if="city.pendingRemoteWeapon" @click="city.pendingRemoteWeapon=null" class="w-full py-1.5 rounded border border-white/20 bg-white/10 text-white text-xs">✕ Cancelar selección</button>
       </div>
     </section>
 
@@ -641,10 +694,10 @@ function btnBase(selected, color) {
       </div>
     </section>
 
-    <!-- 6. COSTA / MUELLES — requiere agua, igual que carreteras requieren variante -->
+    <!-- 6. COSTA / MUELLES + BARCOS — requiere agua -->
     <section class="bg-slate-900/60 rounded-lg border border-slate-700/50 overflow-hidden">
       <button @click="toggle('costa')" class="w-full flex items-center justify-between px-3 py-2 bg-blue-900/20 hover:bg-blue-900/30 transition-colors">
-        <span class="flex items-center gap-2 text-xs font-bold tracking-wider text-blue-300"><span>⚓</span> COSTA — Muelles <span class="text-blue-500/60 font-normal">solo al lado del agua</span></span>
+        <span class="flex items-center gap-2 text-xs font-bold tracking-wider text-blue-300"><span>⚓</span> COSTA — Muelles + Barcos <span class="text-blue-500/60 font-normal">solo agua</span></span>
         <span class="text-blue-300 text-xs">{{ open.costa ? '−' : '+' }}</span>
       </button>
       <div v-show="open.costa" class="p-2 grid grid-cols-3 gap-1.5">
@@ -662,7 +715,16 @@ function btnBase(selected, color) {
           <span class="text-base">{{ tool.icon }}</span><span class="text-[10px] font-semibold">{{ tool.label }}</span><span class="text-[8px] opacity-60">{{ tool.sub }}</span><span class="text-[9px] font-mono text-blue-400">${{ tool.cost }}</span>
         </button>
       </div>
-      <p v-show="open.costa" class="px-2 pb-2 text-[9px] text-blue-400/70 leading-tight">Requiere lago adyacente 🌊 — pinta agua primero.</p>
+      <div v-show="open.costa" class="p-2 grid grid-cols-3 gap-1.5 border-t border-slate-700/30 mt-1 pt-2">
+        <button v-for="tool in [
+          { id: 'boat_small', label: 'Lancha', icon: '⛵', cost: BUILDINGS.boat_small.cost, sub: 'solo agua' },
+          { id: 'patrol_boat', label: 'Patrulla', icon: '🚤', cost: BUILDINGS.patrol_boat.cost, sub: 'solo agua' },
+          { id: 'cargo_ship', label: 'Buque carga', icon: '🚢', cost: BUILDINGS.cargo_ship.cost, sub: '2×1 lleva 6' },
+        ]" :key="tool.id" @click="city.selectedTool = tool.id" class="p-2 rounded border flex flex-col items-center gap-0.5" :class="city.selectedTool===tool.id ? 'bg-sky-500/20 border-sky-500 text-sky-300 ring-1 ring-sky-500' : 'bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700'">
+          <span class="text-base">{{ tool.icon }}</span><span class="text-[10px] font-semibold">{{ tool.label }}</span><span class="text-[8px] opacity-60">{{ tool.sub }}</span><span class="text-[9px] font-mono text-sky-400">${{ tool.cost }}</span>
+        </button>
+      </div>
+      <p v-show="open.costa" class="px-2 pb-2 text-[9px] text-blue-400/70 leading-tight">Barcos solo en agua y navegan solos; buque carga cruza ejército/policía si está junto a muelle.</p>
     </section>
 
     <!-- 7. NATURALEZA — Oxígeno (como carreteras, grid 4 cols) -->

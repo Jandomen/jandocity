@@ -20,7 +20,7 @@
       </div>
     </div>
 
-    <div class="absolute bottom-6 text-[10px] text-white/30 font-mono">© 2026 Jandocity • offline ✓</div>
+    <div class="absolute bottom-6 text-[10px] text-white/30 font-mono">© 2026 Jandosoft ✓</div>
   </div>
 </template>
 

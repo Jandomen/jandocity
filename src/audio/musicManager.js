@@ -85,6 +85,7 @@ const TRACKS = {
   hardcore: { base: 160, mood: 'Hardcore', color: '#dc2626', label: 'Hardcore 8-bit', key: 'A# menor', bpm: 150, prog: 'i-VII-VI-V', melody: [0,1,6,10, 10,6,1,0, 0,1,6,10, 12,10,6,1], bass: [0,0,10,10, 8,8,5,5] },
   ambient_techno: { base: 98, mood: 'Ambient Techno', color: '#14b8a6', label: 'Ambient Techno 8-bit', key: 'E mayor', bpm: 100, prog: 'I-iii-vi-IV', melody: [0,4,7,12, 11,7,4,0, 0,4,7,11, 12,11,7,4], bass: [0,0,4,4, 9,9,5,5] },
   electro: { base: 148, mood: 'Electro', color: '#eab308', label: 'Electro 8-bit', key: 'Bb menor', bpm: 130, prog: 'i-VI-III-VII', melody: [0,5,7,12, 10,7,5,3, 0,5,7,12, 12,10,7,5], bass: [0,0,8,8, 3,3,10,10] },
+  metropoli: { base: 200, mood: 'Metrópoli', color: '#38bdf8', label: 'Metrópoli 8-bit', key: 'C mayor', bpm: 100, prog: 'I-vi-IV-V', melody: [0,4,7,12, 9,7,4,2, 0,2,4,7, 12,9,7,4, 0,4,7,9, 11,9,7,4], bass: [0,0,9,9, 5,5,7,7] },
 }
 
 const TRACK_ORDER = Object.keys(TRACKS)
@@ -163,19 +164,49 @@ function playChiptune(track, fromAuto = false) {
     const gain = ctx.createGain()
     osc.type = 'square'
     osc.frequency.value = freq
-    // envolvente 8-bit con duty
+    // envolvente 8-bit con duty + variación sutil por ritmo
+    const vel = 0.34 + (step % 4 === 0 ? 0.06 : 0) + (Math.random()*0.04)
     gain.gain.setValueAtTime(0, ctx.currentTime)
-    gain.gain.linearRampToValueAtTime(0.38, ctx.currentTime + 0.008)
+    gain.gain.linearRampToValueAtTime(vel, ctx.currentTime + 0.008)
     gain.gain.exponentialRampToValueAtTime(0.02, ctx.currentTime + tick/1000 * 0.85)
     const filt = ctx.createBiquadFilter()
     filt.type = 'lowpass'
-    filt.frequency.value = track.mood === 'Noche' || track.mood === 'Tristeza' ? 1800 : 2600
+    filt.frequency.value = track.mood === 'Noche' || track.mood === 'Tristeza' ? 1800 : 2600 + (step%8===0 ? 400 : 0)
     osc.connect(gain); gain.connect(filt); filt.connect(gainNode)
     osc.start(); osc.stop(ctx.currentTime + tick/1000)
     currentOscs.push(osc, gain, filt)
     if (currentOscs.length > 24) currentOscs.splice(0,3)
 
-    // Bajo cambia cada 2 pasos (blanca)
+    // ritmo por pista: techno/house → four-on-floor, calma → sparse, tensión → doble hi-hat
+    const isTechno = ['techno','house','trance','hardcore','ambient_techno','electro'].includes(Object.keys(TRACKS).find(k=>TRACKS[k]===track))
+    const isCalm = ['calma','noche','serenidad','paz'].includes(Object.keys(TRACKS).find(k=>TRACKS[k]===track))
+    if (isTechno) {
+      // kick en cada beat
+      if (step % 2 === 0) {
+        const kOsc = ctx.createOscillator(); const kGain = ctx.createGain()
+        kOsc.type='sine'; kOsc.frequency.setValueAtTime(55, ctx.currentTime); kOsc.frequency.exponentialRampToValueAtTime(30, ctx.currentTime+0.12)
+        kGain.gain.setValueAtTime(0, ctx.currentTime); kGain.gain.linearRampToValueAtTime(0.18, ctx.currentTime+0.005); kGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime+0.14)
+        kOsc.connect(kGain); kGain.connect(gainNode); kOsc.start(ctx.currentTime); kOsc.stop(ctx.currentTime+0.14)
+        currentOscs.push(kOsc, kGain)
+      }
+      // hi-hat cerrado
+      const hGain = ctx.createGain(); const hFilt = ctx.createBiquadFilter()
+      hFilt.type='highpass'; hFilt.frequency.value=7500
+      hGain.gain.setValueAtTime(0, ctx.currentTime); hGain.gain.linearRampToValueAtTime(0.08, ctx.currentTime+0.002); hGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.05)
+      const hOsc = ctx.createOscillator(); hOsc.type='square'; hOsc.frequency.value=2200+Math.random()*400
+      hOsc.connect(hGain); hGain.connect(hFilt); hFilt.connect(gainNode); hOsc.start(ctx.currentTime); hOsc.stop(ctx.currentTime+0.05)
+      currentOscs.push(hOsc, hGain, hFilt)
+    } else if (!isCalm && step % 2 === 1) {
+      // hi-hat sutil solo en movidas
+      const hGain = ctx.createGain(); const hFilt = ctx.createBiquadFilter()
+      hFilt.type='highpass'; hFilt.frequency.value=7000
+      hGain.gain.setValueAtTime(0, ctx.currentTime); hGain.gain.linearRampToValueAtTime(0.05, ctx.currentTime+0.003); hGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.05)
+      const hOsc = ctx.createOscillator(); hOsc.type='square'; hOsc.frequency.value=1800+Math.random()*400
+      hOsc.connect(hGain); hGain.connect(hFilt); hFilt.connect(gainNode); hOsc.start(ctx.currentTime); hOsc.stop(ctx.currentTime+0.05)
+      currentOscs.push(hOsc, hGain, hFilt)
+    }
+
+    // Bajo cambia cada 2 pasos (blanca) con variación
     if (step % 2 === 0) {
       const bSemi = track.bass[bassStep % track.bass.length]
       const bFreq = (track.base * 0.5) * Math.pow(2, bSemi/12)

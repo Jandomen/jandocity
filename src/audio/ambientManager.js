@@ -149,10 +149,12 @@ export function createAmbientManager() {
         const oscEntry = ambientOscs[key]
         const panner = ambientPanners[key]
         if (!gain) continue
-        const target = score * masterVolume * 0.35
+        const target = score * masterVolume * 0.12
         if (target > 0.01) startOscIfNeeded(key)
-        gain.gain.linearRampToValueAtTime(target, ctx.currentTime + 0.3)
-        if (oscEntry) oscEntry.vol.gain.linearRampToValueAtTime(target > 0 ? 0.15 : 0, ctx.currentTime + 0.3)
+        // pulso sutil para no sonar drone plano
+        const pulse = 0.85 + Math.sin(Date.now()*0.001 + key.charCodeAt(0))*0.15
+        gain.gain.linearRampToValueAtTime(target * pulse, ctx.currentTime + 0.3)
+        if (oscEntry) oscEntry.vol.gain.linearRampToValueAtTime(target > 0 ? 0.07 : 0, ctx.currentTime + 0.3)
         if (panner) {
           const pan = avgPan[key].count ? Math.max(-1, Math.min(1, avgPan[key].sumX / (avgPan[key].count * 2))) : 0
           try { panner.pan.linearRampToValueAtTime(pan * 0.9, ctx.currentTime + 0.4) } catch {}

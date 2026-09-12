@@ -14,8 +14,8 @@ const player = usePlayerStore()
       <h1 class="font-black tracking-[0.18em] text-[15px] leading-none" style="font-family:'Cinzel','Righteous',serif; background: linear-gradient(180deg,#fde68a 0%,#f59e0b 55%,#92400e 100%); -webkit-background-clip:text; background-clip:text; color:transparent; filter: drop-shadow(0 1px 0 rgba(0,0,0,0.8)) drop-shadow(0 2px 6px rgba(245,158,11,0.35));">JANDOCITY</h1>
     </div>
 
-    <!-- Recursos e Indicadores — scroll horizontal en móvil para mantener 1 línea -->
-    <div class="flex items-center gap-2 md:gap-3 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700 overflow-x-auto scrollbar-thin whitespace-nowrap shrink min-w-0 flex-1 justify-center mx-2">
+    <!-- Recursos e Indicadores — scroll horizontal en móvil para mantener 1 línea, arranca a la izq para ver dinero -->
+    <div class="flex items-center gap-2 md:gap-3 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700 overflow-x-auto scrollbar-thin whitespace-nowrap shrink min-w-0 flex-1 justify-start mx-1 md:mx-2">
       <!-- Fondos -->
       <div class="flex items-center gap-1" title="Dinero disponible">
         <span class="text-sm">💰</span>

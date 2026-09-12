@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import { useTrafficStore } from '@/stores/trafficStore.js'
 import { useCityStore } from '@/stores/cityStore.js'
 import { useSinglePlayerStore } from '@/stores/singlePlayerStore.js'
+import { useAudioManager } from '@/audio/audioManager.js'
 
 const selected = ref([]) // [{type:'ped'|'veh', id}]
 const lastCmd = ref(null) // {x,y}
@@ -102,7 +103,7 @@ export function useSelection() {
         if (e.target.type === 'ped') {
           const victim = traffic.pedestrians.find(p => p.id === e.target.targetId)
           if (victim && victim.hp !== undefined) {
-            const dmg = e.kind === 'soldier' ? 22 : e.type === 'tank' ? 38 : e.type === 'cannon' ? 45 : 14
+            const dmg = e.kind === 'sniper' ? 45 : e.kind === 'swat' ? 28 : e.kind === 'soldier' ? 22 : e.type === 'tank' ? 38 : e.type === 'cannon' ? 45 : 14
             victim.hp -= dmg
             try { import('@/audio/audioManager.js').then(m=>m.useAudioManager().effects.playGunShot()) } catch {}
             if (victim.hp <= 0) {
@@ -113,7 +114,7 @@ export function useSelection() {
         } else if (e.target.type === 'veh') {
           const victim = traffic.vehicles.find(v => v.id === e.target.targetId)
           if (victim && victim.hp !== undefined) {
-            const dmg = e.kind === 'soldier' ? 18 : e.type === 'tank' ? 40 : 28
+            const dmg = e.kind === 'sniper' ? 38 : e.kind === 'swat' ? 24 : e.kind === 'soldier' ? 18 : e.type === 'tank' ? 40 : 28
             victim.hp -= dmg
             if (victim.hp <= 0) {
               const idx = traffic.vehicles.findIndex(v => v.id === victim.id)
@@ -128,10 +129,34 @@ export function useSelection() {
           if (origin && origin.buildingId) {
             // daño a edificio: si no tiene hp, inicializa 100
             if (origin.hp === undefined) origin.hp = 100
-            const isCannon = e.type === 'cannon' || e.type === 'tank'
-            const dmg = isCannon ? 35 : e.type === 'tank' ? 28 : e.kind === 'soldier' ? 16 : 10
+            const isAtomic = e.type === 'atomic' || e.unitType === 'atomic'
+            const isCannon = e.type === 'cannon' || e.type === 'tank' || isAtomic
+            const dmg = isAtomic ? 95 : isCannon ? 35 : e.type === 'tank' ? 28 : e.kind === 'sniper' ? 28 : e.kind === 'swat' ? 20 : e.kind === 'soldier' ? 16 : 10
             origin.hp -= dmg
-            if (isCannon) {
+            try { if(isAtomic) { useAudioManager().effects.playBomb(); useAudioManager().effects.playExplosion() } else if(isCannon) useAudioManager().effects.playCannon(); else useAudioManager().effects.playGunShot() } catch {}
+            if (isAtomic) {
+              try { (globalThis||window).dispatchEvent(new CustomEvent('atomic-flash')) } catch {}
+              for (let dy=-3; dy<=3; dy++) for (let dx=-3; dx<=3; dx++) {
+                if (dx===0 && dy===0) continue
+                const nb = city.getCell(origin.x+dx, origin.y+dy)
+                let nbOrig = nb
+                if (nb?.isChild && nb.occupiedBy) nbOrig = city.getCell(nb.occupiedBy.x, nb.occupiedBy.y)
+                if (nbOrig && nbOrig.buildingId) {
+                  if (nbOrig.hp===undefined) nbOrig.hp=100
+                  nbOrig.hp -= Math.round(dmg*0.6)
+                  if (nbOrig.hp<=0) city.demolish(nbOrig.x, nbOrig.y)
+                }
+                const ped2 = traffic.pedestrians.find(p=>p.x===origin.x+dx && p.y===origin.y+dy)
+                if (ped2 && ped2.hp!==undefined) { ped2.hp-=60; if(ped2.hp<=0){ const idx2=traffic.pedestrians.findIndex(x=>x.id===ped2.id); if(idx2!==-1) traffic.pedestrians.splice(idx2,1)} }
+                const veh2 = traffic.vehicles.find(v=>v.x===origin.x+dx && v.y===origin.y+dy)
+                if (veh2 && veh2.hp!==undefined) { veh2.hp-=60; if(veh2.hp<=0){ const idx2=traffic.vehicles.findIndex(x=>x.id===veh2.id); if(idx2!==-1) traffic.vehicles.splice(idx2,1)} }
+              }
+              // consume bomba
+              const atkIdx = traffic.vehicles.findIndex(v=>v.id===e.id)
+              if (atkIdx!==-1) traffic.vehicles.splice(atkIdx,1)
+              else { const pIdx=traffic.pedestrians.findIndex(p=>p.id===e.id); if(pIdx!==-1) traffic.pedestrians.splice(pIdx,1) }
+            } else if (isCannon) {
+              try { useAudioManager().effects.playBomb() } catch {}
               for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++) {
                 if (dx===0 && dy===0) continue
                 const nb = city.getCell(origin.x+dx, origin.y+dy)

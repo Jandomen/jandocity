@@ -9,6 +9,8 @@ let idc = 1
 
 const DURATIONS = {
   police: 2800,
+  swat: 3200,
+  sniper: 3600,
   police_car: 4000,
   soldier: 2500,
   soldier_heavy: 3200,
@@ -16,6 +18,10 @@ const DURATIONS = {
   tank: 6500,
   tractor: 3000,
   cannon: 5500,
+  atomic: 9000,
+  atomic_heavy: 14000,
+  rocket: 4000,
+  missile: 5000,
 }
 
 function findRoadNear(city, ox, oy, w, h) {
@@ -52,7 +58,7 @@ export function useUnitQueue() {
     const perBuilding = queue.value.filter(q => q.bx === o.x && q.by === o.y).length
     if (perBuilding >= 4) return null
     // coste unitario - cobra según dueño
-    const costs = { police: 30, police_car: 80, soldier: 40, soldier_heavy: 60, army_jeep: 90, tank: 180, tractor: 50, cannon: 120 }
+    const costs = { police: 30, swat: 80, sniper: 95, police_car: 80, soldier: 40, soldier_heavy: 60, army_jeep: 90, tank: 180, tractor: 50, cannon: 120, atomic: 500, atomic_heavy: 850, rocket: 50, missile: 200 }
     const cost = costs[unitType] || 30
     if (owner === 'p0') {
       if (city.money < cost) return null
@@ -81,16 +87,25 @@ export function useUnitQueue() {
           const b = BUILDING_TYPES[it.buildingId]
           const road = findRoadNear(city, it.bx, it.by, b.width, b.height)
           if (road) {
-            if (['police_car','army_jeep','tank','tractor','cannon'].includes(it.unitType)) {
-              traffic.addVehicle(road.x, road.y, it.unitType)
+            // unidades a pie vs vehículos — SWAT/francotirador = a pie
+            if (['police_car','army_jeep','tank','tractor','cannon','atomic','atomic_heavy','rocket','missile'].includes(it.unitType)) {
+              traffic.addVehicle(road.x, road.y, it.unitType, it.owner)
             } else {
               // mapea soldier_heavy -> soldier con arma distinta
               const kind = it.unitType === 'soldier_heavy' ? 'soldier' : it.unitType
-              traffic.addPedestrian(road.x, road.y, kind)
+              traffic.addPedestrian(road.x, road.y, kind, it.owner)
               // si heavy, marca isHeavy
               if (it.unitType === 'soldier_heavy') {
                 const p = traffic.pedestrians[traffic.pedestrians.length-1]
                 if (p) { p.isHeavy = true; p.speed = 700 }
+              }
+              if (it.unitType === 'swat') {
+                const p = traffic.pedestrians[traffic.pedestrians.length-1]
+                if (p) { p.isHeavy = true }
+              }
+              if (it.unitType === 'sniper') {
+                const p = traffic.pedestrians[traffic.pedestrians.length-1]
+                if (p) { p.isSniper = true }
               }
             }
           }

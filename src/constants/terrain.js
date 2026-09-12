@@ -115,6 +115,15 @@ export const TERRAIN_TYPES = {
     costModifier: 1,
     palette: ['#57534e', '#44403c', '#78716c', '#292524'],
     decoration: []
+  },
+  scorched: {
+    id: 'scorched',
+    label: 'Tierra quemada',
+    buildable: true,
+    walkable: true,
+    costModifier: 1.2,
+    palette: ['#1c1917', '#0a0a0a', '#292524', '#44403c'],
+    decoration: []
   }
 }
 

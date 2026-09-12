@@ -71,6 +71,7 @@ export const useCityStore = defineStore('city', () => {
   const selectedRailVariant = ref('straight-h')
   const selectedWallVariant = ref('straight-h')
   const selectedHouseVariant = ref('residential')
+  const pendingRemoteWeapon = ref(null) // weaponId pendiente para disparo vía mapa (control remoto)
   const tickCount = ref(0)
   const isPaused = ref(false)
   const lastTickAt = ref(null)
@@ -624,6 +625,135 @@ export const useCityStore = defineStore('city', () => {
     return setTerrain(x, y, terrainId)
   }
 
+  // Remote strike — cohetes/misiles/bombas atómicas vía mapa
+  // Usa lógica existente de escombros gris (rubble) → tierra (dirt -12s) → pasto (grass -37s)
+  const REMOTE_RADIUS = { rocket: 1, missile: 2, atomic: 3, atomic_heavy: 5 }
+  const REMOTE_COST = { rocket: 50, missile: 200, atomic: 500, atomic_heavy: 850 }
+  const REMOTE_DAMAGE = { rocket: 65, missile: 120, atomic: 300, atomic_heavy: 520 }
+  function remoteStrike(targetX, targetY, weaponId) {
+    const radius = REMOTE_RADIUS[weaponId] ?? 1
+    const cost = REMOTE_COST[weaponId] ?? 50
+    const damage = REMOTE_DAMAGE[weaponId] ?? 65
+    if (money.value < cost) return { ok: false, reason: `Fondos insuficientes (${cost}💰)` }
+    const startX = targetX - radius
+    const endX = targetX + radius
+    const startY = targetY - radius
+    const endY = targetY + radius
+    // asegura que el área exista expandiendo grid si el tiro es fuera
+    ensureGridContains(startX, startY)
+    ensureGridContains(endX, endY)
+    money.value -= cost
+    let destroyed = 0
+    const rubbleCells = []
+    // Flash atómico si es atomic_* — pesada naranja + casi negro
+    const isAtomic = weaponId === 'atomic' || weaponId === 'atomic_heavy'
+    const isHeavy = weaponId === 'atomic_heavy'
+    const terrainIdForBlast = isHeavy ? 'scorched' : 'rubble'
+    if (isAtomic) {
+      try { (globalThis||window).dispatchEvent(new CustomEvent('atomic-flash', { detail: { weaponId, heavy: isHeavy } })) } catch {}
+      // fallback simple
+      try { (globalThis||window).dispatchEvent(new CustomEvent('atomic-flash')) } catch {}
+    }
+    // alarma atómica solo para atómicas (no cohetes) — suena un tiempo en otras ciudades
+    if (isAtomic) {
+      try { (globalThis||window).dispatchEvent(new CustomEvent('atomic-alarm', { detail: { weaponId, x: targetX, y: targetY, heavy: isHeavy } })) } catch {}
+    }
+    for (let y = startY; y <= endY; y++) {
+      for (let x = startX; x <= endX; x++) {
+        const cell = getCell(x, y)
+        if (!cell) continue
+        // encuentra origen si es hijo 2x2 etc
+        let origin = cell
+        let ox = x, oy = y
+        if (cell.isChild && cell.occupiedBy) {
+          ox = cell.occupiedBy.x; oy = cell.occupiedBy.y
+          origin = getCell(ox, oy)
+          if (!origin) origin = cell
+        }
+        // daña/edificio -> destruye (sin reembolso)
+        if (origin && origin.buildingId) {
+          const building = BUILDING_TYPES[origin.buildingId]
+          if (!building) continue
+          // HP sistem: si no tiene, destruir directo por explosión
+          const w = building.width || 1, h = building.height || 1
+          // borra huella completa sin reembolso
+          for (let dy = 0; dy < h; dy++) for (let dx = 0; dx < w; dx++) {
+            const c = getCell(ox+dx, oy+dy)
+            if (c) {
+              c.buildingId = null; c.isOrigin=false; c.isChild=false; c.occupiedBy=null
+              c.hasRoad=false; c.hasRail=false; c.roadVariant=null; c.railVariant=null; c.wallVariant=null
+              c.terrain=terrainIdForBlast; c.terrainType=terrainIdForBlast
+              rubbleCells.push({x: ox+dx, y: oy+dy})
+            }
+          }
+          destroyed++
+        } else {
+          // celda vacía o carretera/riel -> vuelve rubble gris / scorched casi negro para pesada
+          if (cell.hasRoad || cell.hasRail) {
+            cell.hasRoad=false; cell.hasRail=false; cell.roadVariant=null; cell.railVariant=null
+            if (['road','dirt_road','concrete_road','cobble_road','rail'].includes(cell.buildingId)) {
+              cell.buildingId=null; cell.isOrigin=false; cell.isChild=false; cell.occupiedBy=null
+            }
+          }
+          cell.buildingId=null; cell.isOrigin=false; cell.isChild=false; cell.occupiedBy=null
+          // deja escombros — pesada casi negro, normal gris
+          if (cell.terrain !== terrainIdForBlast) {
+            cell.terrain=terrainIdForBlast; cell.terrainType=terrainIdForBlast
+            rubbleCells.push({x, y})
+          }
+        }
+      }
+    }
+    // Rubble/scorched regeneración: mismo patrón que demolish 12s→dirt 37s→grass
+    const uniqueRubble = new Map(rubbleCells.map(c=>[`${c.x},${c.y}`,c]))
+    for (const rc of uniqueRubble.values()) {
+      setTimeout(() => {
+        const cc = getCell(rc.x, rc.y)
+        if (cc && (cc.terrain === 'rubble' || cc.terrain === 'scorched') && !cc.buildingId && !cc.isChild) { cc.terrain='dirt'; cc.terrainType='dirt' }
+      }, 12000)
+      setTimeout(() => {
+        const cc2 = getCell(rc.x, rc.y)
+        if (cc2 && cc2.terrain === 'dirt' && !cc2.buildingId && !cc2.isChild) { cc2.terrain='grass'; cc2.terrainType='grass' }
+      }, 37000)
+    }
+    // Intento de daño a unidades — importa trafficStore lazy (evita circular)
+    ;(async () => {
+      try {
+        const { useTrafficStore } = await import('@/stores/trafficStore.js')
+        const traffic = useTrafficStore()
+        const radiusCheb = radius
+        for (let i = traffic.pedestrians.length - 1; i >= 0; i--) {
+          const p = traffic.pedestrians[i]
+          if (Math.abs(p.x - targetX) <= radiusCheb && Math.abs(p.y - targetY) <= radiusCheb) {
+            if (p.hp !== undefined) {
+              p.hp -= Math.round(damage * 0.35)
+              if (p.hp <= 0) traffic.pedestrians.splice(i, 1)
+            } else {
+              // 70% muere directo si es civil sin HP
+              if (Math.random() < 0.7 || isAtomic) traffic.pedestrians.splice(i, 1)
+            }
+          }
+        }
+        for (let i = traffic.vehicles.length - 1; i >= 0; i--) {
+          const v = traffic.vehicles[i]
+          if (Math.abs(v.x - targetX) <= radiusCheb && Math.abs(v.y - targetY) <= radiusCheb) {
+            if (v.hp !== undefined) { v.hp -= Math.round(damage * 0.4); if (v.hp <= 0) traffic.vehicles.splice(i,1) }
+            else if (isAtomic || Math.random()<0.6) traffic.vehicles.splice(i,1)
+          }
+        }
+        for (let i = traffic.boats.length - 1; i >= 0; i--) {
+          const b = traffic.boats[i]
+          if (Math.abs(b.x - targetX) <= radiusCheb && Math.abs(b.y - targetY) <= radiusCheb) traffic.boats.splice(i,1)
+        }
+      } catch {}
+    })()
+    syncDerivedResources()
+    immediateSave(); scheduleSave(800)
+    const area = (radius*2+1)
+    log(`☢️ ${weaponId} en (${targetX},${targetY}) área ${area}x${area} • ${destroyed} edificios arrasados -${cost}💰 — escombros grises → pasto`)
+    return { ok: true, destroyed, rubble: uniqueRubble.size }
+  }
+
   function isWaterCell(cell) { return cell.terrain === 'water' || cell.terrain === 'deep_water' || cell.terrainType === 'water' || cell.terrainType === 'deep_water' }
 
   function canBuildOnTerrain(terrainId) {
@@ -945,6 +1075,7 @@ export const useCityStore = defineStore('city', () => {
     selectedRailVariant,
     selectedWallVariant,
     selectedHouseVariant,
+    pendingRemoteWeapon,
     tickCount,
     isPaused,
     lastTickAt,
@@ -961,6 +1092,7 @@ export const useCityStore = defineStore('city', () => {
     placeBuildingAt,
     forcePlaceBuilding,
     demolish,
+    remoteStrike,
     fillTerrain,
     setTerrain,
     paintTerrain,

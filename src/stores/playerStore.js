@@ -1,12 +1,15 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useCityStore } from './cityStore.js'
+import { CHARACTERS, getCharacter } from '@/config/characters.js'
 
 export const usePlayerStore = defineStore('player', () => {
   const x = ref(0)
   const y = ref(0)
   const dir = ref('down')
   const isMoving = ref(false)
+  const characterId = ref(localStorage.getItem('jandocity-character') || 'exec_male')
+  const character = computed(() => getCharacter(characterId.value) || CHARACTERS[0])
 
   const pixelPos = computed(() => {
     const city = useCityStore()
@@ -44,5 +47,12 @@ export const usePlayerStore = defineStore('player', () => {
 
   function setPos(nx, ny) { x.value = nx; y.value = ny }
 
-  return { x, y, dir, isMoving, pixelPos, move, setPos }
+  function setCharacter(id) {
+    if (!CHARACTERS.find(c=>c.id===id)) return false
+    characterId.value = id
+    try { localStorage.setItem('jandocity-character', id) } catch {}
+    return true
+  }
+
+  return { x, y, dir, isMoving, pixelPos, characterId, character, setCharacter, move, setPos }
 })

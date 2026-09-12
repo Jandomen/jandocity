@@ -5,14 +5,16 @@ import { useTrafficStore } from '@/stores/trafficStore.js'
 import { useSinglePlayerStore } from '@/stores/singlePlayerStore.js'
 import { useSelection } from '@/composables/useSelection.js'
 import { useAudioManager } from '@/audio/audioManager.js'
+import { usePerformance } from '@/composables/usePerformance.js'
 
 const city = useCityStore()
 const traffic = useTrafficStore()
 const single = useSinglePlayerStore()
 const selection = useSelection()
 const audio = useAudioManager()
+const perf = usePerformance()
 
-const vehicleIcons = { car: '🚗', pickup: '🛻', moto: '🏍️', trailer: '🚛', bus: '🚌', police_car: '🚔', ambulance: '🚑', fire_truck: '🚒', army_jeep: '🚙', tank: '🛡️', tractor: '🚜', cannon: '💣' }
+const vehicleIcons = { car: '🚗', pickup: '🛻', moto: '🏍️', trailer: '🚛', bus: '🚌', police_car: '🚔', ambulance: '🚑', fire_truck: '🚒', army_jeep: '🚙', tank: '🛡️', tractor: '🚜', cannon: '💣', atomic: '☢️', atomic_heavy: '☢️', rocket: '🚀', missile: '🚀', boat_small: '⛵', patrol_boat: '🚤', cargo_ship: '🚢' }
 
 function posFor(entity) {
   const ox = city.offsetX ?? city.grid[0]?.[0]?.x ?? 0
@@ -33,24 +35,22 @@ function panFor(x) {
 }
 
 let timer = null
-onMounted(() => {
+function startTick() {
+  if (timer) clearInterval(timer)
+  const ms = perf.preset.value.trafficTickMs ?? 500
   timer = setInterval(() => {
     traffic.tick()
-    // sonido ambiente sincronizado con posición de vehículos/peatones (izq-der)
     try {
       const v = traffic.vehicles[0]
       if (v) {
-        const p = panFor(v.x)
-        // usa ambientManager con panning si existe, si no solo actualiza
         audio.ambient.update(city.grid, { x: v.x, y: v.y })
-        // pequeño blip de motor con panning (si hay AudioContext)
-        // no saturar: solo 1 de cada 3 ticks
-        if (Math.random() < 0.35) {
-          // panning via Web Audio StereoPanner si está disponible
-        }
       }
     } catch {}
-  }, 500)
+  }, ms)
+}
+onMounted(() => {
+  startTick()
+  watch(() => perf.effectiveQuality.value, startTick)
 })
 onUnmounted(() => clearInterval(timer))
 
@@ -70,6 +70,8 @@ const pedBodies = {
   lawyer:{ head: '#ffecd2', hair: '#334155', shirt: '#1e293b', pants: '#0f172a', h: 12 },
   judge:{ head: '#e8c4a8', hair: '#e5e7eb', shirt: '#000000', pants: '#000000', h: 12 },
   soldier:{ head: '#ffecd2', hair: '#365314', shirt: '#65a30d', pants: '#365314', h: 12 },
+  swat:   { head: '#ffecd2', hair: '#1e293b', shirt: '#0f172a', pants: '#1e293b', h: 12 },
+  sniper: { head: '#e8c4a8', hair: '#365314', shirt: '#57534e', pants: '#44403c', h: 12 },
 }
 </script>
 
@@ -85,6 +87,16 @@ const pedBodies = {
     >
       <span :class="{ 'drop-shadow-[0_0_4px_rgba(59,130,246,0.8)]': v.type==='police_car', 'drop-shadow-[0_0_4px_rgba(239,68,68,0.8)]': v.type==='ambulance' }">{{ vehicleIcons[v.type] || '🚗' }}</span>
       <div v-if="v.hp!==undefined && v.hp<100" class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-[16px] h-1 bg-black/40 rounded-full overflow-hidden border border-white/20"><div class="h-full bg-red-500" :style="{width: v.hp+'%'}"></div></div>
+    </div>
+    <div
+      v-for="b in traffic.boats"
+      :key="'b'+b.id"
+      class="absolute w-[26px] h-[26px] -translate-x-1/2 -translate-y-1/2 flex items-center justify-center text-[18px] select-none"
+      :style="{ left: posFor(b).x + 'px', top: posFor(b).y + 'px', transform: `translate(-50%,-50%) rotate(${rotMap[b.dir]||0}deg)`, transition: `left ${b.speed}ms linear, top ${b.speed}ms linear, transform 180ms` }"
+      :title="b.type + (b.cargo?.length ? ' cargo:'+b.cargo.length : '')"
+    >
+      <span class="drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]">{{ vehicleIcons[b.type] || '⛵' }}</span>
+      <div v-if="b.cargo && b.cargo.length" class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 border border-white text-[8px] font-black flex items-center justify-center">{{ b.cargo.length }}</div>
     </div>
     <!-- Peatones con cuerpo, pies y manos, caminando lento -->
     <div

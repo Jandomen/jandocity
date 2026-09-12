@@ -1183,6 +1183,39 @@ export const BUILDING_TYPES = {
     incomePerTick: 6,
     color: 'bg-yellow-800',
     description: '1×1 — al lado del agua'
+  },
+  boat_small: {
+    id: 'boat_small',
+    label: 'Lancha',
+    icon: '⛵',
+    width: 1, height: 1,
+    cost: 40,
+    effects: { population: 0, energy: 0, water: 0 },
+    incomePerTick: 0,
+    color: 'bg-sky-600',
+    description: '1×1 • solo agua • auto'
+  },
+  patrol_boat: {
+    id: 'patrol_boat',
+    label: 'Patrulla agua',
+    icon: '🚤',
+    width: 1, height: 1,
+    cost: 80,
+    effects: { population: 0, energy: 0, water: 0 },
+    incomePerTick: 0,
+    color: 'bg-blue-700',
+    description: '1×1 • patrulla agua'
+  },
+  cargo_ship: {
+    id: 'cargo_ship',
+    label: 'Buque carga',
+    icon: '🚢',
+    width: 2, height: 1,
+    cost: 180,
+    effects: { population: 0, energy: 0, water: 0 },
+    incomePerTick: 0,
+    color: 'bg-slate-600',
+    description: '2×1 • lleva 6 unidades'
   }
 }
 

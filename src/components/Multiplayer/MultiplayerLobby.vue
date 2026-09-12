@@ -93,7 +93,7 @@ onMounted(async () => { publicRooms.value = await loadPublic() })
       <div class="flex items-center justify-between">
         <button @click="emit('back')" class="px-3 py-1.5 rounded-full bg-white/10 border border-white/10 text-xs">‹ Volver</button>
         <h2 class="font-black tracking-widest text-sm" style="font-family:'Cinzel',serif;">MULTIJUGADOR — 8</h2>
-        <span class="text-[10px] text-white/40">Supabase</span>
+        <span class="text-[10px] text-white/40">En línea</span>
       </div>
 
       <div v-if="mode==='menu'" class="space-y-3">
