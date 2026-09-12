@@ -122,9 +122,9 @@ onMounted(async () => { publicRooms.value = await loadPublic() })
       <div v-else-if="mode==='host'" class="bg-[#1e293b] border-[3px] border-[#334155] rounded-xl shadow-[0_8px_0_#0f172a] p-4 space-y-3">
         <div class="text-xs font-bold" style="color:#fde68a;">Tu color anfitrión</div>
         <div class="flex gap-1.5 flex-wrap">
-          <button v-for="c in single.COLORS" :key="c.id" @click="myColor=c.id" class="w-7 h-7 rounded-full border-2" :style="{background:c.bg, borderColor: myColor===c.id ? '#fff' : 'transparent'}"></button>
+          <button v-for="c in single.COLORS" :key="c.id" @click="myColor=c.id" class="w-7 h-7 rounded-full border-2 shadow-[0_2px_0_#0f172a]" :style="{background:c.bg, borderColor: myColor===c.id ? '#fff' : 'transparent'}"></button>
         </div>
-        <button @click="createRoom" :disabled="loading" class="w-full py-2.5 rounded-xl bg-[#16a34a] border-2 border-[#22c55e] shadow-[0_6px_0_#052e16] text-white font-bold disabled:opacity-50 active:translate-y-[2px]">{{ loading ? 'Creando...' : 'Crear sala JND-XXXX' }}</button>
+        <button @click="createRoom" :disabled="loading" class="w-full py-2.5 rounded-xl bg-[#16a34a] border-2 border-[#22c55e] shadow-[0_6px_0_#052e16] text-white font-black disabled:opacity-50 active:translate-y-[2px]">{{ loading ? 'Creando...' : 'Crear sala JND-XXXX' }}</button>
         <p v-if="error" class="text-xs text-red-400">{{ error }}</p>
         <button @click="mode='menu'" class="text-xs text-white/60">‹ Volver</button>
       </div>
@@ -143,7 +143,7 @@ onMounted(async () => { publicRooms.value = await loadPublic() })
         </div>
         <div class="flex items-center gap-2">
           <span class="text-xs">Tu color:</span>
-          <button v-for="c in single.COLORS" :key="c.id" @click="myColor=c.id; updateMyColor()" class="w-6 h-6 rounded-full border-2" :style="{background:c.bg, borderColor: myColor===c.id ? '#fff' : 'transparent'}"></button>
+          <button v-for="c in single.COLORS" :key="c.id" @click="myColor=c.id; updateMyColor()" class="w-6 h-6 rounded-full border-2 shadow-[0_2px_0_#0f172a]" :style="{background:c.bg, borderColor: myColor===c.id ? '#fff' : 'transparent'}"></button>
         </div>
         <button @click="toggleReady" class="w-full py-2 rounded-xl font-bold text-sm border-2 shadow-[0_4px_0_#0f172a]" :class="players.find(p=>p.id && p.ready) ? 'bg-white/10 border-white/10 text-white/70' : 'bg-sky-600 border-sky-400 text-white'">{{ players.find(p=>p.ready) ? 'Desmarcar' : '✓ Confirmar listo' }}</button>
         <p class="text-[11px] text-white/40">Anfitrión entra directo (ya listo). Invitados confirman ✓. Colores duplicados permitidos. Reconexión auto.</p>

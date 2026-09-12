@@ -62,17 +62,17 @@ function start() {
 
         <div class="bg-[#0f172a]/60 rounded-lg border-2 border-[#334155] p-3 space-y-3">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-bold text-white">Colores</span>
-            <button @click="randomize" class="px-2 py-1 rounded-full text-[11px] border" :class="useRandom ? 'bg-amber-500 border-amber-400 text-white' : 'bg-white/10 border-white/10 text-white/60'">🎲 {{ useRandom ? 'Aleatorio ON' : 'Aleatorio' }}</button>
+            <span class="text-xs font-bold text-white" style="color:#fde68a;">Colores</span>
+            <button @click="randomize" class="px-2 py-1 rounded-full text-[11px] border-2 shadow-[0_2px_0_#0f172a]" :class="useRandom ? 'bg-amber-500 border-amber-400 text-white' : 'bg-[#1e293b] border-[#334155] text-white/60'">🎲 {{ useRandom ? 'Aleatorio ON' : 'Aleatorio' }}</button>
           </div>
           <div class="flex items-center gap-2">
             <span class="text-[11px] w-16">Tú:</span>
-            <button v-for="c in single.COLORS" :key="c.id" @click="pickMyColor(c.id)" class="w-7 h-7 rounded-full border-2 flex items-center justify-center" :style="{background:c.bg, borderColor: myColor===c.id ? '#fff' : 'transparent'}" :title="c.label"><span v-if="myColor===c.id" class="text-[10px]">✓</span></button>
+            <button v-for="c in single.COLORS" :key="c.id" @click="pickMyColor(c.id)" class="w-7 h-7 rounded-full border-2 flex items-center justify-center shadow-[0_2px_0_#0f172a]" :style="{background:c.bg, borderColor: myColor===c.id ? '#fff' : 'transparent'}" :title="c.label"><span v-if="myColor===c.id" class="text-[10px]">✓</span></button>
             <span class="text-[11px] ml-2" :style="{color: single.COLORS.find(x=>x.id===myColor)?.bg}">{{ single.COLORS.find(x=>x.id===myColor)?.label }}</span>
           </div>
           <div v-for="i in enemies" :key="i" class="flex items-center gap-2">
             <span class="text-[11px] w-16">{{ is2vs2 && i===1 ? 'Aliado:' : `Enemigo ${i}:` }}</span>
-            <button v-for="c in single.COLORS" :key="c.id" @click="pickEnemyColor(i-1,c.id)" class="w-6 h-6 rounded-full border" :style="{background:c.bg, borderColor: enemyColors[i-1]===c.id ? '#fff' : 'transparent', opacity: enemyColors[i-1]===c.id ? 1 : 0.7}"></button>
+            <button v-for="c in single.COLORS" :key="c.id" @click="pickEnemyColor(i-1,c.id)" class="w-6 h-6 rounded-full border-2 shadow-[0_2px_0_#0f172a]" :style="{background:c.bg, borderColor: enemyColors[i-1]===c.id ? '#fff' : 'transparent', opacity: enemyColors[i-1]===c.id ? 1 : 0.7}"></button>
           </div>
           <div class="text-[11px] text-white/50 leading-tight">
             <span v-if="is2vs2">2 vs 2 predeterminado: Tú + aliado vs 2 CPUs.</span>
