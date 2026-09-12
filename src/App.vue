@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useCityStore } from '@/stores/cityStore.js'
 import { usePlayerStore } from '@/stores/playerStore.js'
 import { useGameLoop } from '@/composables/useGameLoop.js'
