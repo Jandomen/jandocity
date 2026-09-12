@@ -46,17 +46,17 @@ function start() {
       <div class="bg-[#1e293b] border-[3px] border-[#334155] rounded-xl shadow-[0_8px_0_#0f172a,0_12px_24px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.15)] p-4 space-y-4">
         <div class="text-xs font-bold tracking-wider text-sky-300">Elige modo (máx 4 jugadores)</div>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <button @click="enemies=1; teamMode='1vs3'" class="py-3 rounded-xl border-2 flex flex-col items-center gap-1 shadow-[0_4px_0_#0f172a]" :class="enemies===1 ? 'bg-sky-600 border-sky-400 text-white' : 'bg-[#1e293b] border-[#334155] text-white/70'">
-            <span class="text-sm font-black">1 vs 1</span><span class="text-[10px]">2 jugadores</span>
+          <button @click="enemies=1; teamMode='1vs3'" class="group py-3 rounded-xl border-2 flex flex-col items-center gap-1 shadow-[0_6px_0_#052e16] active:translate-y-[2px] transition-all" :class="enemies===1 ? 'bg-[#14532d] border-[#16a34a] text-white' : 'bg-[#1e293b] border-[#334155] text-white/70'">
+            <span class="text-lg">⚔️</span><span class="text-sm font-black">1 vs 1</span><span class="text-[10px]">2 jugadores</span>
           </button>
-          <button @click="enemies=2; teamMode='1vs3'" class="py-3 rounded-xl border-2 flex flex-col items-center gap-1 shadow-[0_4px_0_#0f172a]" :class="enemies===2 ? 'bg-sky-600 border-sky-400 text-white' : 'bg-[#1e293b] border-[#334155] text-white/70'">
-            <span class="text-sm font-black">1 vs 2</span><span class="text-[10px]">3 jugadores</span>
+          <button @click="enemies=2; teamMode='1vs3'" class="group py-3 rounded-xl border-2 flex flex-col items-center gap-1 shadow-[0_6px_0_#1e1b4b] active:translate-y-[2px] transition-all" :class="enemies===2 ? 'bg-[#1e3a8a] border-[#38bdf8] text-white' : 'bg-[#1e293b] border-[#334155] text-white/70'">
+            <span class="text-lg">⚔️</span><span class="text-sm font-black">1 vs 2</span><span class="text-[10px]">3 jugadores</span>
           </button>
-          <button @click="enemies=3; teamMode='1vs3'" class="py-2 rounded-xl border-2 flex flex-col items-center gap-1 shadow-[0_4px_0_#0f172a]" :class="enemies===3 && teamMode==='1vs3' ? 'bg-sky-600 border-sky-400 text-white' : 'bg-[#1e293b] border-[#334155] text-white/70'">
-            <span class="text-sm font-black">1 vs 3</span><span class="text-[10px]">4 jug. todos vs tú</span>
+          <button @click="enemies=3; teamMode='1vs3'" class="group py-2 rounded-xl border-2 flex flex-col items-center gap-1 shadow-[0_6px_0_#3b0764] active:translate-y-[2px] transition-all" :class="enemies===3 && teamMode==='1vs3' ? 'bg-[#581c87] border-[#a78bfa] text-white' : 'bg-[#1e293b] border-[#334155] text-white/70'">
+            <span class="text-lg">⚔️</span><span class="text-sm font-black">1 vs 3</span><span class="text-[10px]">4 jug. todos vs tú</span>
           </button>
-          <button @click="enemies=3; teamMode='2vs2'" class="py-2 rounded-xl border-2 flex flex-col items-center gap-1 shadow-[0_4px_0_#0f172a]" :class="teamMode==='2vs2' ? 'bg-emerald-600 border-emerald-400 text-white' : 'bg-[#1e293b] border-[#334155] text-white/70'">
-            <span class="text-sm font-black">2 vs 2</span><span class="text-[10px]">predeterminado</span>
+          <button @click="enemies=3; teamMode='2vs2'" class="group py-2 rounded-xl border-2 flex flex-col items-center gap-1 shadow-[0_6px_0_#78350f] active:translate-y-[2px] transition-all" :class="teamMode==='2vs2' ? 'bg-[#92400e] border-[#f59e0b] text-white' : 'bg-[#1e293b] border-[#334155] text-white/70'">
+            <span class="text-lg">🤝</span><span class="text-sm font-black">2 vs 2</span><span class="text-[10px]">predeterminado</span>
           </button>
         </div>
 

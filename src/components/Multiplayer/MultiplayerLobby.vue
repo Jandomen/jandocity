@@ -103,8 +103,8 @@ onMounted(async () => { publicRooms.value = await loadPublic() })
         <div class="bg-[#1e293b] border-[3px] border-[#334155] rounded-xl shadow-[0_8px_0_#0f172a] p-3 space-y-2">
           <div class="text-xs font-bold">Unirse por clave</div>
           <div class="flex gap-2">
-            <input v-model="key" placeholder="JND-XXXX" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm uppercase" maxlength="8" />
-            <button @click="joinRoom" class="px-4 py-2 rounded-lg bg-sky-600 text-white font-bold">Unirse</button>
+            <input v-model="key" placeholder="JND-XXXX" class="flex-1 bg-[#0f172a] border-2 border-[#334155] rounded-xl px-3 py-2 text-sm uppercase" maxlength="8" />
+            <button @click="joinRoom" class="px-4 py-2 rounded-xl bg-[#1e3a8a] hover:bg-[#1e40af] border-2 border-[#38bdf8] shadow-[0_4px_0_#1e1b4b] text-white font-bold active:translate-y-[1px]">Unirse</button>
           </div>
           <p v-if="error" class="text-xs text-red-400">{{ error }}</p>
         </div>
