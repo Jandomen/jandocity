@@ -9,6 +9,7 @@ let currentOscs = []
 let isMuted = false
 let intervalId = null
 let bassOsc = null
+const isLowEnd = typeof navigator !== 'undefined' && ((navigator.deviceMemory || 4) <= 2 || (navigator.hardwareConcurrency || 4) <= 2 || !!navigator.connection?.saveData)
 
 function getContext() {
   if (!audioCtx) {
@@ -141,20 +142,25 @@ function playChiptune(track, fromAuto = false) {
     gainNode.gain.linearRampToValueAtTime(isMuted ? 0 : 0.34, ctx.currentTime + 1.2)
   }
   scheduleAutoNext()
-  const tick = 60000 / track.bpm / 2 // corchea
+  const tick = isLowEnd ? 60000 / track.bpm / 1.5 : 60000 / track.bpm / 2 // más lento en móvil para menos carga
   let step = 0
 
-  // Bajo continuo 8-bit
+  // Bajo continuo 8-bit — simplificado en móvil
   bassOsc = ctx.createOscillator()
   const bassGain = ctx.createGain()
-  const bassFilter = ctx.createBiquadFilter()
   bassOsc.type = 'square'
-  bassGain.gain.value = 0.13
-  bassFilter.type = 'lowpass'
-  bassFilter.frequency.value = 650
-  bassOsc.connect(bassGain); bassGain.connect(bassFilter); bassFilter.connect(gainNode)
+  bassGain.gain.value = isLowEnd ? 0.09 : 0.13
+  if (isLowEnd) {
+    bassOsc.connect(bassGain); bassGain.connect(gainNode)
+  } else {
+    const bassFilter = ctx.createBiquadFilter()
+    bassFilter.type = 'lowpass'
+    bassFilter.frequency.value = 650
+    bassOsc.connect(bassGain); bassGain.connect(bassFilter); bassFilter.connect(gainNode)
+    currentOscs.push(bassFilter)
+  }
   bassOsc.start()
-  currentOscs.push(bassOsc, bassGain, bassFilter)
+  currentOscs.push(bassOsc, bassGain)
 
   let bassStep = 0
   intervalId = setInterval(() => {
@@ -165,45 +171,50 @@ function playChiptune(track, fromAuto = false) {
     osc.type = 'square'
     osc.frequency.value = freq
     // envolvente 8-bit con duty + variación sutil por ritmo
-    const vel = 0.34 + (step % 4 === 0 ? 0.06 : 0) + (Math.random()*0.04)
+    const vel = isLowEnd ? 0.28 : 0.34 + (step % 4 === 0 ? 0.06 : 0) + (Math.random()*0.04)
     gain.gain.setValueAtTime(0, ctx.currentTime)
     gain.gain.linearRampToValueAtTime(vel, ctx.currentTime + 0.008)
     gain.gain.exponentialRampToValueAtTime(0.02, ctx.currentTime + tick/1000 * 0.85)
-    const filt = ctx.createBiquadFilter()
-    filt.type = 'lowpass'
-    filt.frequency.value = track.mood === 'Noche' || track.mood === 'Tristeza' ? 1800 : 2600 + (step%8===0 ? 400 : 0)
-    osc.connect(gain); gain.connect(filt); filt.connect(gainNode)
+    if (isLowEnd) {
+      osc.connect(gain); gain.connect(gainNode)
+    } else {
+      const filt = ctx.createBiquadFilter()
+      filt.type = 'lowpass'
+      filt.frequency.value = track.mood === 'Noche' || track.mood === 'Tristeza' ? 1800 : 2600 + (step%8===0 ? 400 : 0)
+      osc.connect(gain); gain.connect(filt); filt.connect(gainNode)
+      currentOscs.push(filt)
+    }
     osc.start(); osc.stop(ctx.currentTime + tick/1000)
-    currentOscs.push(osc, gain, filt)
-    if (currentOscs.length > 24) currentOscs.splice(0,3)
+    currentOscs.push(osc, gain)
+    if (currentOscs.length > (isLowEnd ? 14 : 24)) currentOscs.splice(0,3)
 
     // ritmo por pista: techno/house → four-on-floor, calma → sparse, tensión → doble hi-hat
-    const isTechno = ['techno','house','trance','hardcore','ambient_techno','electro'].includes(Object.keys(TRACKS).find(k=>TRACKS[k]===track))
-    const isCalm = ['calma','noche','serenidad','paz'].includes(Object.keys(TRACKS).find(k=>TRACKS[k]===track))
-    if (isTechno) {
-      // kick en cada beat
-      if (step % 2 === 0) {
-        const kOsc = ctx.createOscillator(); const kGain = ctx.createGain()
-        kOsc.type='sine'; kOsc.frequency.setValueAtTime(55, ctx.currentTime); kOsc.frequency.exponentialRampToValueAtTime(30, ctx.currentTime+0.12)
-        kGain.gain.setValueAtTime(0, ctx.currentTime); kGain.gain.linearRampToValueAtTime(0.18, ctx.currentTime+0.005); kGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime+0.14)
-        kOsc.connect(kGain); kGain.connect(gainNode); kOsc.start(ctx.currentTime); kOsc.stop(ctx.currentTime+0.14)
-        currentOscs.push(kOsc, kGain)
+    // En móvil low-end se omite hi-hat/kick para no saturar CPU
+    if (!isLowEnd) {
+      const isTechno = ['techno','house','trance','hardcore','ambient_techno','electro'].includes(Object.keys(TRACKS).find(k=>TRACKS[k]===track))
+      const isCalm = ['calma','noche','serenidad','paz'].includes(Object.keys(TRACKS).find(k=>TRACKS[k]===track))
+      if (isTechno) {
+        if (step % 2 === 0) {
+          const kOsc = ctx.createOscillator(); const kGain = ctx.createGain()
+          kOsc.type='sine'; kOsc.frequency.setValueAtTime(55, ctx.currentTime); kOsc.frequency.exponentialRampToValueAtTime(30, ctx.currentTime+0.12)
+          kGain.gain.setValueAtTime(0, ctx.currentTime); kGain.gain.linearRampToValueAtTime(0.18, ctx.currentTime+0.005); kGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime+0.14)
+          kOsc.connect(kGain); kGain.connect(gainNode); kOsc.start(ctx.currentTime); kOsc.stop(ctx.currentTime+0.14)
+          currentOscs.push(kOsc, kGain)
+        }
+        const hGain = ctx.createGain(); const hFilt = ctx.createBiquadFilter()
+        hFilt.type='highpass'; hFilt.frequency.value=7500
+        hGain.gain.setValueAtTime(0, ctx.currentTime); hGain.gain.linearRampToValueAtTime(0.08, ctx.currentTime+0.002); hGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.05)
+        const hOsc = ctx.createOscillator(); hOsc.type='square'; hOsc.frequency.value=2200+Math.random()*400
+        hOsc.connect(hGain); hGain.connect(hFilt); hFilt.connect(gainNode); hOsc.start(ctx.currentTime); hOsc.stop(ctx.currentTime+0.05)
+        currentOscs.push(hOsc, hGain, hFilt)
+      } else if (!isCalm && step % 2 === 1) {
+        const hGain = ctx.createGain(); const hFilt = ctx.createBiquadFilter()
+        hFilt.type='highpass'; hFilt.frequency.value=7000
+        hGain.gain.setValueAtTime(0, ctx.currentTime); hGain.gain.linearRampToValueAtTime(0.05, ctx.currentTime+0.003); hGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.05)
+        const hOsc = ctx.createOscillator(); hOsc.type='square'; hOsc.frequency.value=1800+Math.random()*400
+        hOsc.connect(hGain); hGain.connect(hFilt); hFilt.connect(gainNode); hOsc.start(ctx.currentTime); hOsc.stop(ctx.currentTime+0.05)
+        currentOscs.push(hOsc, hGain, hFilt)
       }
-      // hi-hat cerrado
-      const hGain = ctx.createGain(); const hFilt = ctx.createBiquadFilter()
-      hFilt.type='highpass'; hFilt.frequency.value=7500
-      hGain.gain.setValueAtTime(0, ctx.currentTime); hGain.gain.linearRampToValueAtTime(0.08, ctx.currentTime+0.002); hGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.05)
-      const hOsc = ctx.createOscillator(); hOsc.type='square'; hOsc.frequency.value=2200+Math.random()*400
-      hOsc.connect(hGain); hGain.connect(hFilt); hFilt.connect(gainNode); hOsc.start(ctx.currentTime); hOsc.stop(ctx.currentTime+0.05)
-      currentOscs.push(hOsc, hGain, hFilt)
-    } else if (!isCalm && step % 2 === 1) {
-      // hi-hat sutil solo en movidas
-      const hGain = ctx.createGain(); const hFilt = ctx.createBiquadFilter()
-      hFilt.type='highpass'; hFilt.frequency.value=7000
-      hGain.gain.setValueAtTime(0, ctx.currentTime); hGain.gain.linearRampToValueAtTime(0.05, ctx.currentTime+0.003); hGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.05)
-      const hOsc = ctx.createOscillator(); hOsc.type='square'; hOsc.frequency.value=1800+Math.random()*400
-      hOsc.connect(hGain); hGain.connect(hFilt); hFilt.connect(gainNode); hOsc.start(ctx.currentTime); hOsc.stop(ctx.currentTime+0.05)
-      currentOscs.push(hOsc, hGain, hFilt)
     }
 
     // Bajo cambia cada 2 pasos (blanca) con variación

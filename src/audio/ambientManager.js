@@ -11,6 +11,7 @@ let audioCtx = null
 const ambientGains = {}
 const ambientOscs = {}
 const ambientPanners = {}
+const isLowEnd = typeof navigator !== 'undefined' && ((navigator.deviceMemory || 4) <= 2 || (navigator.hardwareConcurrency || 4) <= 2 || !!navigator.connection?.saveData)
 
 // Definición de ambientes — cada uno con su frecuencia base (placeholder oscilador)
 const AMBIENTS = {
@@ -125,7 +126,7 @@ export function createAmbientManager() {
      * grid: 2D array, camera: {x,y}
      */
     update(grid, camera = { x: 5, y: 5 }) {
-      if (!enabled) return
+      if (!enabled || isLowEnd) return
       const ctx = getContext()
       if (ctx.state === 'suspended') ctx.resume()
       ensureAmbientNodes()
