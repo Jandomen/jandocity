@@ -11,8 +11,9 @@ const text = ref('')
 const listRef = ref(null)
 
 function send() {
-  const t = text.value.trim()
+  let t = text.value.trim().slice(0, 80)
   if (!t) return
+  if (t.length > 80) t = t.slice(0, 80)
   emit('send', t)
   text.value = ''
 }
@@ -43,7 +44,7 @@ watch(() => props.messages.length, async () => {
         </div>
       </div>
       <form @submit.prevent="send" class="flex items-center gap-2 p-2 border-t border-white/10 bg-slate-800/40">
-        <input v-model="text" type="text" maxlength="120" placeholder="Escribe mensaje…" class="flex-1 bg-slate-900 border border-slate-700 rounded-full px-3 py-2 text-xs placeholder:text-white/30 focus:outline-none focus:border-emerald-500" autofocus />
+        <input v-model="text" type="text" maxlength="80" placeholder="Oración corta (80)…" class="flex-1 bg-slate-900 border border-slate-700 rounded-full px-3 py-2 text-xs placeholder:text-white/30 focus:outline-none focus:border-emerald-500" autofocus />
         <button type="submit" class="px-4 py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shrink-0">Enviar</button>
       </form>
       <div class="px-3 py-1 text-[10px] text-white/30 text-center">Local por ahora — multijugador usará Supabase Realtime</div>

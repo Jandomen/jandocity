@@ -76,11 +76,11 @@ supabase.auth.onAuthStateChange((_e,sess)=> isLogged.value=!!sess)
 async function doLogout(){ await supabase.auth.signOut(); isLogged.value=false }
 const chatMessages = ref([])
 const nowTick = ref(Date.now())
-setInterval(() => nowTick.value = Date.now(), 500)
+setInterval(() => nowTick.value = Date.now(), 400)
 const recentChats = computed(() => {
   const now = nowTick.value
-  // últimos 3 pero solo los de últimos 4s, luego se desvanecen
-  return chatMessages.value.filter(m => now - (m.at || 0) < 4200).slice(-3)
+  // 4 renglones máx, 3s en pantalla luego se desvanecen, a la derecha 100px en móvil
+  return chatMessages.value.filter(m => now - (m.at || 0) < 3000).slice(-4)
 })
 const trackToast = ref(null)
 let trackToastTimer = null
@@ -100,6 +100,8 @@ const atomicAlarm = ref(null)
 let alarmTimer = null
 const botPhrases = ['Construyendo…','Avanzando con cautela','Reforzando defensas','En camino','Posicionando unidades','Ajustando estrategia']
 function sendChat(text) {
+  text = String(text).trim().slice(0, 80)
+  if (!text) return
   const at = Date.now()
   chatMessages.value.push({ id: at + Math.random(), sender: 'Tú', text, time: new Date().toLocaleTimeString(), at })
   if (multiRoom.value) {
@@ -524,7 +526,7 @@ onUnmounted(() => {
 
       <!-- Chat overlay — T web / 💬 móvil, listo para multijugador -->
       <ChatBox :show="showChat" :messages="chatMessages" @send="sendChat" @close="showChat=false" />
-      <TransitionGroup name="chat-toast" tag="div" class="absolute bottom-20 left-3 z-20 pointer-events-none flex flex-col gap-1 max-w-[280px]">
+      <TransitionGroup name="chat-toast" tag="div" class="absolute bottom-20 left-[100px] md:left-3 z-20 pointer-events-none flex flex-col gap-1 max-w-[220px] md:max-w-[280px]">
         <div v-for="m in recentChats" :key="'toast-'+m.id" v-show="!showChat && appState==='playing'" class="bg-black/70 backdrop-blur px-3 py-1.5 rounded-full border border-white/15 text-xs flex items-center gap-2 shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
           <span class="font-bold text-emerald-300">{{ m.sender }}:</span><span class="text-white/90 truncate">{{ m.text }}</span>
         </div>
