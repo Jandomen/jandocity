@@ -21,6 +21,9 @@ function setJoystick(t) { emit('update:joystickType', t) }
 function openCharacterSelect() {
   try { window.dispatchEvent(new CustomEvent('open-character-select')) } catch {}
 }
+const prizes = computed(() => {
+  try { return JSON.parse(localStorage.getItem('jandocity-prizes') || '[]').slice(0,5) } catch { return [] }
+})
 </script>
 
 <template>
@@ -54,6 +57,11 @@ function openCharacterSelect() {
                 Tus: {{ city.flatGrid.filter(c=>c.isOrigin && c.owner===single.humanPlayer()?.id).length }} edificios / {{ traffic.pedestrians.filter(p=>p.owner===single.humanPlayer()?.id).length + traffic.vehicles.filter(v=>v.owner===single.humanPlayer()?.id).length }} unidades<br>
                 CPU: {{ city.flatGrid.filter(c=>c.isOrigin && c.owner && c.owner!==single.humanPlayer()?.id).length }} edificios
               </div>
+            </div>
+            <div class="bg-black/30 rounded-xl border-2 border-amber-400/30 p-3">
+              <div class="text-xs font-black text-white">🏆 Historial Premios</div>
+              <div v-if="prizes.length===0" class="text-[11px] text-white/40">Sin premios — gana cuando el rival se sale</div>
+              <div v-for="pr in prizes" :key="pr.date" class="text-[10px] text-white/70 border-b border-white/10 py-1 flex justify-between"><span>{{ new Date(pr.date).toLocaleDateString() }} {{ pr.reason }}</span><span class="font-mono">{{ pr.room }}</span></div>
             </div>
           </template>
 

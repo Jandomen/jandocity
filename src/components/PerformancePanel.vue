@@ -7,10 +7,10 @@ const perf = usePerformance()
 <template>
   <div class="bg-[#1e293b] border-2 border-[#334155] rounded-xl p-3 space-y-3">
     <div class="flex items-center justify-between">
-      <span class="text-xs font-black text-white">⚡ Rendimiento — Móvil</span>
-      <span class="text-[10px] font-mono bg-black/30 px-2 py-1 rounded-full border border-white/10" :class="perf.isLowEnd.value ? 'text-amber-300' : 'text-emerald-300'">{{ perf.effectiveQuality.value }} • {{ perf.preset.value.label }}</span>
+      <span class="text-xs font-black text-white">⚡ Rendimiento</span>
+      <span class="text-[10px] font-mono bg-black/30 px-2 py-1 rounded-full border border-white/10" :class="perf.isLowEnd.value ? 'text-amber-300' : 'text-emerald-300'">{{ perf.effectiveQuality.value }} • {{ perf.preset.value.label }} {{ perf.isMobile.value ? '📱' : '🖥️' }}</span>
     </div>
-    <p class="text-[11px] text-white/60 leading-tight">Auto detecta tu dispositivo y limita entidades/efectos para no trabarse. Cambia a Ahorro en móviles lentos.</p>
+    <p class="text-[11px] text-white/60 leading-tight"><span v-if="perf.isMobile.value">Móvil detectado: se limita entidades para no trabarse.</span><span v-else>Web detectado: usa Alto por defecto. Cambia a Ahorro solo si tu móvil va lento.</span></p>
     <div class="grid grid-cols-4 gap-1.5">
       <button
         v-for="q in ['auto','high','medium','low']"

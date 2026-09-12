@@ -11,27 +11,51 @@ const loading = ref(false)
 const error = ref('')
 const ok = ref('')
 
-function validEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) }
+function sanitize(v, max=64) { return v.trim().slice(0, max).replace(/[<>]/g,'') }
+function validEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) && v.length <= 254 }
+function validUsername(v) { return /^[a-zA-Z0-9_]{3,20}$/.test(v) }
 function validPhone(v) { return /^\+?\d{8,15}$/.test(v.replace(/\s/g,'')) }
 
 async function handleSignUp() {
   error.value=''; ok.value=''
-  if (!validEmail(email.value)) { error.value='Correo inválido'; return }
-  if (username.value.trim().length < 3) { error.value='Usuario mínimo 3 caracteres'; return }
-  if (password.value.length < 6) { error.value='Contraseña mínimo 6 caracteres'; return }
-  if (!validPhone(phone.value)) { error.value='Teléfono 8-15 dígitos (+ opcional)'; return }
+  const e = sanitize(email.value, 254).toLowerCase()
+  const u = sanitize(username.value, 20)
+  const p = phone.value.trim()
+  if (!validEmail(e)) { error.value='Correo inválido'; return }
+  if (!validUsername(u)) { error.value='Usuario 3-20 alfanuméricos o _'; return }
+  if (password.value.length < 6 || password.value.length > 72) { error.value='Contraseña 6-72 caracteres'; return }
+  if (!validPhone(p)) { error.value='Teléfono 8-15 dígitos (+ opcional)'; return }
   loading.value = true
   try {
+    // verifica duplicado correo/usuario si existe tabla profiles
+    try {
+      const { data: dup } = await supabase.from('profiles').select('username').ilike('username', u).limit(1)
+      if (dup && dup.length) throw new Error('Usuario ya existe, elige otro')
+    } catch (dupErr) {
+      if (dupErr.message === 'Usuario ya existe, elige otro') throw dupErr
+    }
     const { data, error: err } = await supabase.auth.signUp({
-      email: email.value.trim(),
+      email: e,
       password: password.value,
-      options: { data: { username: username.value.trim(), phone: phone.value.trim() } }
+      options: { data: { username: u, phone: sanitize(p, 20) } }
     })
-    if (err) throw err
-    ok.value='Cuenta creada — revisa tu correo'
+    if (err) {
+      const msg = (err.message || '').toLowerCase()
+      if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('duplicate') || msg.includes('user already')) throw new Error('Correo ya registrado')
+      throw err
+    }
+    // si confirmación por correo está activa, no hay sesión inmediata
+    if (!data.user && !data.session) {
+      ok.value='Cuenta creada — revisa tu correo para confirmar'
+    } else {
+      ok.value='Cuenta creada — ya puedes entrar'
+    }
     emit('success')
   } catch (e) {
-    error.value = e.message || 'Error al crear cuenta'
+    const m = (e.message || '').toLowerCase()
+    if (m.includes('already registered') || m.includes('already exists') || m.includes('duplicate')) error.value = 'Correo ya registrado'
+    else if (m.includes('usuario ya existe')) error.value = e.message
+    else error.value = e.message || 'Error al crear cuenta'
   } finally { loading.value=false }
 }
 </script>

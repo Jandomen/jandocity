@@ -8,19 +8,23 @@ const password = ref('')
 const loading = ref(false)
 const error = ref('')
 
-function validEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) }
+function sanitize(v, max=64) { return v.trim().slice(0, max).replace(/[<>]/g,'') }
+function validEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) && v.length <= 254 }
 
 async function handleLogin() {
   error.value=''
-  if (!validEmail(email.value)) { error.value='Correo inválido'; return }
+  const e = sanitize(email.value, 254).toLowerCase()
+  if (!validEmail(e)) { error.value='Correo inválido'; return }
   if (password.value.length < 6) { error.value='Contraseña requerida'; return }
   loading.value=true
   try {
-    const { error: err } = await supabase.auth.signInWithPassword({ email: email.value.trim(), password: password.value })
+    const { error: err } = await supabase.auth.signInWithPassword({ email: e, password: password.value })
     if (err) throw err
     emit('success')
   } catch (e) {
-    error.value = e.message.includes('Invalid login') ? 'Credenciales incorrectas' : e.message
+    const m = (e.message || '').toLowerCase()
+    if (m.includes('invalid login') || m.includes('invalid') || m.includes('not confirmed')) error.value = 'Credenciales incorrectas o correo no confirmado'
+    else error.value = e.message
   } finally { loading.value=false }
 }
 </script>

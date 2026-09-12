@@ -19,6 +19,7 @@ import { useSelection } from '@/composables/useSelection.js'
 import { BUILDINGS } from '@/constants/buildings.js'
 import VehicleLayer from './VehicleLayer.vue'
 import AirportPlaneLayer from './AirportPlaneLayer.vue'
+import MultiplayerPlayersLayer from './MultiplayerPlayersLayer.vue'
 import { useAudioManager } from '@/audio/audioManager.js'
 import { usePerformance } from '@/composables/usePerformance.js'
 import { watch } from 'vue'
@@ -206,6 +207,9 @@ const hasAnyWater = computed(() => {
   for (const row of city.grid) for (const c of row) if (c.terrain === 'water' || c.terrain === 'deep_water') return true
   return false
 })
+function broadcastIfMulti(x,y,buildingId) {
+  try { window.dispatchEvent(new CustomEvent('multi-build-local', { detail: { x, y, buildingId } })) } catch {}
+}
 
 function getValidation(cell) {
   if (!city.selectedTool) return { ok: false, reason: null }
@@ -310,7 +314,7 @@ function handleCellClick(cell) {
     if (dur === 0) {
       const res = city.placeBuildingAt(cell.x, cell.y, effectiveTool, single.humanPlayer()?.id || 'p0')
       if (!res.ok && res.reason) showAviso(`${res.reason} en (${cell.x},${cell.y})`)
-      else single.hasEverBuilt = true
+      else { single.hasEverBuilt = true; broadcastIfMulti(cell.x, cell.y, effectiveTool) }
       return
     } else {
       if (buildQueue.findAt(cell.x, cell.y)) { showAviso('Ya en construcción en ('+cell.x+','+cell.y+')'); return }
@@ -319,12 +323,15 @@ function handleCellClick(cell) {
       const added = buildQueue.add(cell.x, cell.y, effectiveTool, single.humanPlayer()?.id || 'p0')
       if (!added) { showAviso('Fondos insuficientes o ya en cola'); return }
       showAviso(`En construcción ${BUILDINGS[effectiveTool]?.label || effectiveTool} ${Math.round(added.progress)}%`)
+      // broadcast también para cola (cuando termine se hace via buildQueue watcher en App)
+      broadcastIfMulti(cell.x, cell.y, effectiveTool)
       return
     }
   }
   const res = city.placeBuilding(cell.x, cell.y)
   if (!res.ok && res.reason) showAviso(`${res.reason} en (${cell.x},${cell.y})`)
   else {
+    broadcastIfMulti(cell.x, cell.y, city.selectedTool)
     // Tras 10 casas de cualquier tipo, spawnea peatones automáticamente
     const houseCount = city.grid.flat().filter(c => c.isOrigin && ['residential','residential_small','residential_medium','residential_large','tower_residential','apartment_block','skyscraper'].includes(c.buildingId)).length
     if (houseCount >= 10 && houseCount % 5 === 0 && traffic.pedestrians.length < 20) {
@@ -407,6 +414,7 @@ function handleCellEnter(cell) {
         <VehicleLayer />
         <AirportPlaneLayer />
         <Player />
+        <MultiplayerPlayersLayer />
       </div>
 
       <!-- Hitbox virtualizado — celdas 48×48 fijas, coordenadas mundo corregidas con offset -->

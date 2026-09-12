@@ -48,10 +48,10 @@ const emit = defineEmits(['select'])
         </button>
       </div>
 
-      <div class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 flex items-center justify-center gap-2">
-        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-        <span class="text-[10px] text-white/60 font-mono">JANDOSOFT • v2.0</span>
-      </div>
+    </div>
+    <div class="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5 text-[10px] text-white/40 font-mono">
+      <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+      <span>JANDOSOFT • v2.0</span>
     </div>
   </div>
 </template>

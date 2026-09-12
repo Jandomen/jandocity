@@ -32,33 +32,35 @@ function start() {
 </script>
 
 <template>
-  <div class="absolute inset-0 z-30 flex flex-col bg-[#0f172a] text-white overflow-hidden">
-    <div class="absolute inset-0 bg-gradient-to-b from-[#0f172a] via-[#1e293b] to-[#0f172a] opacity-60"></div>
-    <div class="relative flex-1 flex flex-col max-w-[520px] w-full mx-auto p-4 gap-4 overflow-auto">
+  <div class="absolute inset-0 z-30 flex flex-col bg-[#0a0f1e] text-white overflow-hidden p-4 py-6">
+    <div class="absolute inset-0 bg-[#0a0f1e]"></div>
+    <div class="absolute inset-0 opacity-40" style="background-image: linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px); background-size: 28px 28px;"></div>
+    <div class="absolute inset-0" style="background: radial-gradient(ellipse at 50% 0%, rgba(56,189,248,0.18), transparent 60%), radial-gradient(ellipse at 50% 100%, rgba(16,185,129,0.12), transparent 50%);"></div>
+    <div class="relative flex-1 flex flex-col max-w-[520px] w-full mx-auto gap-4 overflow-auto">
       <div class="flex items-center justify-between shrink-0">
-        <button @click="emit('back')" class="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-xs">‹ Volver</button>
-        <h2 class="font-black tracking-widest text-sm" style="font-family:'Cinzel',serif;">UN JUGADOR — VS CPU</h2>
-        <span class="text-[10px] text-white/40">offline</span>
+        <button @click="emit('back')" class="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-xs backdrop-blur">‹ Volver</button>
+        <h2 class="font-black tracking-widest text-sm" style="font-family:'Cinzel',serif; color:#fde68a; text-shadow: 0 1px 0 #92400e;">UN JUGADOR — VS CPU</h2>
+        <span class="text-[10px] text-white/40 bg-black/30 px-2 py-1 rounded-full border border-white/10">offline</span>
       </div>
 
-      <div class="bg-slate-800/80 rounded-xl border border-white/10 p-4 space-y-4">
+      <div class="bg-[#1e293b] border-[3px] border-[#334155] rounded-xl shadow-[0_8px_0_#0f172a,0_12px_24px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.15)] p-4 space-y-4">
         <div class="text-xs font-bold tracking-wider text-sky-300">Elige modo (máx 4 jugadores)</div>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <button @click="enemies=1; teamMode='1vs3'" class="py-3 rounded-xl border flex flex-col items-center gap-1" :class="enemies===1 ? 'bg-sky-600 border-sky-400 text-white' : 'bg-slate-700 border-white/10 text-white/70'">
+          <button @click="enemies=1; teamMode='1vs3'" class="py-3 rounded-xl border-2 flex flex-col items-center gap-1 shadow-[0_4px_0_#0f172a]" :class="enemies===1 ? 'bg-sky-600 border-sky-400 text-white' : 'bg-[#1e293b] border-[#334155] text-white/70'">
             <span class="text-sm font-black">1 vs 1</span><span class="text-[10px]">2 jugadores</span>
           </button>
-          <button @click="enemies=2; teamMode='1vs3'" class="py-3 rounded-xl border flex flex-col items-center gap-1" :class="enemies===2 ? 'bg-sky-600 border-sky-400 text-white' : 'bg-slate-700 border-white/10 text-white/70'">
+          <button @click="enemies=2; teamMode='1vs3'" class="py-3 rounded-xl border-2 flex flex-col items-center gap-1 shadow-[0_4px_0_#0f172a]" :class="enemies===2 ? 'bg-sky-600 border-sky-400 text-white' : 'bg-[#1e293b] border-[#334155] text-white/70'">
             <span class="text-sm font-black">1 vs 2</span><span class="text-[10px]">3 jugadores</span>
           </button>
-          <button @click="enemies=3; teamMode='1vs3'" class="py-2 rounded-xl border flex flex-col items-center gap-1" :class="enemies===3 && teamMode==='1vs3' ? 'bg-sky-600 border-sky-400 text-white' : 'bg-slate-700 border-white/10 text-white/70'">
+          <button @click="enemies=3; teamMode='1vs3'" class="py-2 rounded-xl border-2 flex flex-col items-center gap-1 shadow-[0_4px_0_#0f172a]" :class="enemies===3 && teamMode==='1vs3' ? 'bg-sky-600 border-sky-400 text-white' : 'bg-[#1e293b] border-[#334155] text-white/70'">
             <span class="text-sm font-black">1 vs 3</span><span class="text-[10px]">4 jug. todos vs tú</span>
           </button>
-          <button @click="enemies=3; teamMode='2vs2'" class="py-2 rounded-xl border flex flex-col items-center gap-1" :class="teamMode==='2vs2' ? 'bg-emerald-600 border-emerald-400 text-white' : 'bg-slate-700 border-white/10 text-white/70'">
+          <button @click="enemies=3; teamMode='2vs2'" class="py-2 rounded-xl border-2 flex flex-col items-center gap-1 shadow-[0_4px_0_#0f172a]" :class="teamMode==='2vs2' ? 'bg-emerald-600 border-emerald-400 text-white' : 'bg-[#1e293b] border-[#334155] text-white/70'">
             <span class="text-sm font-black">2 vs 2</span><span class="text-[10px]">predeterminado</span>
           </button>
         </div>
 
-        <div class="bg-slate-900/60 rounded-lg border border-white/10 p-3 space-y-3">
+        <div class="bg-[#0f172a]/60 rounded-lg border-2 border-[#334155] p-3 space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-xs font-bold text-white">Colores</span>
             <button @click="randomize" class="px-2 py-1 rounded-full text-[11px] border" :class="useRandom ? 'bg-amber-500 border-amber-400 text-white' : 'bg-white/10 border-white/10 text-white/60'">🎲 {{ useRandom ? 'Aleatorio ON' : 'Aleatorio' }}</button>
@@ -79,7 +81,7 @@ function start() {
         </div>
 
         <div class="text-[11px] text-white/50 leading-tight">Vegetación instant, calles 0.8s, edificios 2-11s con barra 0-100%.</div>
-        <button @click="start" class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black">▶ Iniciar partida</button>
+        <button @click="start" class="w-full py-3 rounded-xl bg-[#16a34a] hover:bg-[#15803d] border-2 border-[#22c55e] shadow-[0_6px_0_#052e16] text-white font-black active:translate-y-[2px] transition-all">▶ Iniciar partida</button>
       </div>
     </div>
   </div>

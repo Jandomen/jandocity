@@ -75,6 +75,23 @@ supabase.auth.getSession().then(({data})=> isLogged.value=!!data.session)
 supabase.auth.onAuthStateChange((_e,sess)=> isLogged.value=!!sess)
 async function doLogout(){ await supabase.auth.signOut(); isLogged.value=false }
 const chatMessages = ref([])
+const nowTick = ref(Date.now())
+setInterval(() => nowTick.value = Date.now(), 500)
+const recentChats = computed(() => {
+  const now = nowTick.value
+  // últimos 3 pero solo los de últimos 4s, luego se desvanecen
+  return chatMessages.value.filter(m => now - (m.at || 0) < 4200).slice(-3)
+})
+const trackToast = ref(null)
+let trackToastTimer = null
+function showTrackToast(id) {
+  const t = audioMgr.music.tracks[id]
+  if (!t) return
+  trackToast.value = `${t.label} • ${t.mood}`
+  clearTimeout(trackToastTimer)
+  trackToastTimer = setTimeout(() => trackToast.value = null, 2200)
+}
+watch(() => audioMgr.music.currentTrack, (id) => showTrackToast(id))
 const multiSync = useMultiplayerSync()
 function onAuthenticated() { showAuth.value=false; isLogged.value=true; if(pendingMulti.value){ pendingMulti.value=false; handleMenuSelect('multi') } }
 const atomicTrigger = ref(0)
@@ -83,14 +100,16 @@ const atomicAlarm = ref(null)
 let alarmTimer = null
 const botPhrases = ['Construyendo…','Avanzando con cautela','Reforzando defensas','En camino','Posicionando unidades','Ajustando estrategia']
 function sendChat(text) {
-  chatMessages.value.push({ id: Date.now() + Math.random(), sender: 'Tú', text, time: new Date().toLocaleTimeString() })
+  const at = Date.now()
+  chatMessages.value.push({ id: at + Math.random(), sender: 'Tú', text, time: new Date().toLocaleTimeString(), at })
   if (multiRoom.value) {
     multiSync.broadcastChat(text, 'Tú')
   } else if (single.isActive) {
     setTimeout(() => {
       const cpu = single.players.find(p=>!p.isHuman)
       const reply = botPhrases[Math.floor(Math.random()*botPhrases.length)]
-      chatMessages.value.push({ id: Date.now()+Math.random(), sender: cpu ? `CPU ${cpu.color}` : 'CPU', text: reply, time: new Date().toLocaleTimeString() })
+      const at2 = Date.now()
+      chatMessages.value.push({ id: at2+Math.random(), sender: cpu ? `CPU ${cpu.color}` : 'CPU', text: reply, time: new Date().toLocaleTimeString(), at: at2 })
       if (chatMessages.value.length > 80) chatMessages.value.shift()
     }, 900 + Math.random()*800)
   }
@@ -244,7 +263,7 @@ function handleMultiStart(room) {
     // reconexión automática vía Supabase Realtime + OfflineBanner
     window.addEventListener('multi-chat', (e) => {
       const d = e.detail
-      chatMessages.value.push({ id: Date.now()+Math.random(), sender: d.sender, text: d.text, time: d.time })
+      chatMessages.value.push({ id: Date.now()+Math.random(), sender: d.sender, text: d.text, time: d.time || new Date().toLocaleTimeString(), at: Date.now() })
       if (chatMessages.value.length > 80) chatMessages.value.shift()
     })
     // al construir, CityGrid broadcastBuild vía watcher abajo
@@ -284,6 +303,22 @@ function handlePlay(worldId) {
 function exitToMenu() {
   if (multiRoom.value) {
     appState.value = 'returning'
+    // avisa a otros que me fui (para victoria auto si quedan 2→1)
+    ;(async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) multiSync.broadcastLeave(user.id)
+        // también quita del array players en supabase
+        const cur = multiRoom.value
+        if (cur) {
+          const { data } = await supabase.from('rooms').select('*').eq('id', cur.id).single()
+          if (data) {
+            const upd = (data.players || []).filter(p => p.id !== user?.id)
+            await supabase.from('rooms').update({ players: upd }).eq('id', cur.id)
+          }
+        }
+      } catch {}
+    })()
     multiSync.leave()
     setTimeout(() => { multiRoom.value = null; appState.value = 'menu' }, 700)
     return
@@ -333,6 +368,52 @@ onMounted(async () => {
     city.logs.unshift(heavy ? `🚨 ALARMA ATÓMICA PESADA — otras ciudades en alerta 11s` : `🚨 Alarma atómica — otras ciudades en alerta 8s`)
   })
   window.addEventListener('open-character-select', () => { showCharacterSelect.value = true; pendingMode.value = null })
+  // Multiplayer: broadcast builds y posición protagonista en tiempo real
+  window.addEventListener('multi-build-local', async (e) => {
+    if (!multiRoom.value) return
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const owner = user?.id || null
+      multiSync.broadcastBuild(e.detail.x, e.detail.y, e.detail.buildingId, owner)
+    } catch {}
+  })
+  // throttled player pos broadcast (100ms)
+  let lastPosBroadcast = 0
+  watch(() => [player.x, player.y, player.characterId], async () => {
+    if (!multiRoom.value || appState.value !== 'playing') return
+    const now = Date.now()
+    if (now - lastPosBroadcast < 120) return
+    lastPosBroadcast = now
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      multiSync.broadcastPlayerPos({ id: user.id, x: player.x, y: player.y, characterId: player.characterId, username: user.email.split('@')[0], color: player.character?.icon || '👤' })
+    } catch {}
+  })
+  // victoria auto si quedan 2 y uno se sale
+  window.addEventListener('multi-player-leave', async (e) => {
+    if (!multiRoom.value || appState.value !== 'playing') return
+    const remaining = multiSync.remotePlayers.value.size + 1 // + yo
+    if (remaining === 1) {
+      // yo gano
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        const prizes = JSON.parse(localStorage.getItem('jandocity-prizes') || '[]')
+        prizes.unshift({ date: new Date().toISOString(), reason: 'Rival se salió', room: multiRoom.value.key, winner: user?.id })
+        localStorage.setItem('jandocity-prizes', JSON.stringify(prizes.slice(0,20)))
+      } catch {}
+      const m = victory.metrics()
+      victoryData.value = { isWin: true, winner: { username: 'Tú' }, metrics: m }
+      showVictory.value = true
+      isPaused.value = true
+      city.pause()
+    } else if (remaining === 0) {
+      // todos se fueron
+      exitToMenu()
+    }
+    // si quedan 2 y se va uno, el otro gana ya manejado arriba (1)
+    // si quedan >2, sigue
+  })
   // OTA auto-update para APK offline-first: si hay internet, baja update y aplica al reiniciar
   try {
     const { useAutoUpdater } = await import('@/composables/useAutoUpdater.js')
@@ -443,6 +524,11 @@ onUnmounted(() => {
 
       <!-- Chat overlay — T web / 💬 móvil, listo para multijugador -->
       <ChatBox :show="showChat" :messages="chatMessages" @send="sendChat" @close="showChat=false" />
+      <TransitionGroup name="chat-toast" tag="div" class="absolute bottom-20 left-3 z-20 pointer-events-none flex flex-col gap-1 max-w-[280px]">
+        <div v-for="m in recentChats" :key="'toast-'+m.id" v-show="!showChat && appState==='playing'" class="bg-black/70 backdrop-blur px-3 py-1.5 rounded-full border border-white/15 text-xs flex items-center gap-2 shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+          <span class="font-bold text-emerald-300">{{ m.sender }}:</span><span class="text-white/90 truncate">{{ m.text }}</span>
+        </div>
+      </TransitionGroup>
 
       <!-- Overlay pausa — web Esc y móvil -->
       <PauseMenu :show="isPaused && !showVictory" :joystickType="joystickType" @resume="resumeGame" @exit="exitToMenu" @surrender="surrender" @update:joystickType="joystickType=$event" />
@@ -477,11 +563,6 @@ onUnmounted(() => {
     <!-- Auth multijugador (fuera de la cadena v-if) -->
     <AuthModal :show="showAuth" @close="showAuth=false" @authenticated="onAuthenticated" />
     <CharacterSelect :show="showCharacterSelect" @select="handleCharacterSelect" @close="handleCharacterClose" />
-    <div v-if="appState==='menu'" class="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2">
-      <button @click="openMenuCharacterSelect" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur border border-white/15 text-[11px] text-white hover:bg-white/15">
-        <span class="text-sm">{{ player.character && player.character.icon ? player.character.icon : '👤' }}</span> {{ player.character && player.character.label ? player.character.label : 'Protagonista' }} • cambiar
-      </button>
-    </div>
     <div v-if="appState==='menu' && isLogged" class="absolute top-2 right-2 z-30">
       <button @click="doLogout" class="px-2.5 py-1 rounded-full bg-black/60 border border-white/15 text-[11px] text-white">Salir</button>
     </div>
@@ -503,4 +584,9 @@ onUnmounted(() => {
 }
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
+.chat-toast-enter-active { transition: all 0.25s ease; }
+.chat-toast-leave-active { transition: all 0.4s ease; }
+.chat-toast-enter-from { opacity: 0; transform: translateY(8px) scale(0.96); }
+.chat-toast-leave-to { opacity: 0; transform: translateY(-4px) scale(0.98); }
+.chat-toast-move { transition: transform 0.25s ease; }
 </style>
