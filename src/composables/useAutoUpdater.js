@@ -28,7 +28,20 @@ async function getCurrentVersion() {
     if (cur?.bundle?.version) return cur.bundle.version
     if (cur?.version) return cur.version
   } catch {}
-  try { return localStorage.getItem(APPLIED_KEY) || '0.1.32' } catch { return '0.1.32' }
+  try {
+    const applied = localStorage.getItem(APPLIED_KEY)
+    if (applied) return applied
+  } catch {}
+  // fallback: lee version embebida en el APK (assets/public/version.json) — evita loop si current() falla en debug
+  try {
+    const r = await fetch('./version.json', { cache: 'no-store' })
+    if (r.ok) { const j = await r.json(); if (j?.version) return j.version }
+  } catch {}
+  try {
+    const r2 = await fetch('/version.json', { cache: 'no-store' })
+    if (r2.ok) { const j2 = await r2.json(); if (j2?.version) return j2.version }
+  } catch {}
+  return '0.1.35'
 }
 
 function compareVersions(a, b) {
