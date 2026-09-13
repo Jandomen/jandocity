@@ -84,6 +84,7 @@ function toggleCoopSetting(key) {
             <button @click="openCharacterSelect" class="w-full py-3 rounded-xl bg-[#1e293b] hover:bg-[#334155] text-white font-black border-2 border-[#38bdf8] shadow-[0_4px_0_#0f172a] flex items-center justify-center gap-2">👤 Cambiar protagonista</button>
             <button v-if="single.isActive" @click="emit('surrender')" class="w-full py-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-black border-2 border-amber-400 shadow-[0_4px_0_#92400e]">🏳️ Claudicar</button>
             <button @click="emit('exit')" class="w-full py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black border-2 border-red-400 shadow-[0_4px_0_#7f1d1d]">‹ Menú</button>
+            <button @click="tab='cuenta'" class="w-full py-2.5 rounded-xl bg-black/30 border border-white/10 text-white/60 text-xs font-bold hover:text-white hover:bg-white/5">⚙️ Cuenta y datos</button>
             <div v-if="single.isActive" class="bg-black/30 rounded-xl border-2 border-[#334155] p-3">
               <div class="text-xs font-black text-white">📊 Métricas</div>
               <div class="text-[11px] text-white/60 leading-tight mt-1">
@@ -103,7 +104,6 @@ function toggleCoopSetting(key) {
               <label class="flex items-center justify-between text-xs cursor-pointer"><span>Combate</span><input type="checkbox" :checked="multiSync.coopSettings.value.allowCombat" @change="toggleCoopSetting('allowCombat')" class="accent-emerald-500" /></label>
               <p class="text-[10px] text-white/40">Cambios se notifican a todos con toast.</p>
             </div>
-            <button @click="handleDeleteAccount" class="w-full py-2.5 rounded-xl font-bold text-xs border-2 flex items-center justify-center gap-2" :class="confirmDeleteAccount ? 'bg-red-600 border-red-400 text-white animate-pulse' : 'bg-black/30 border-red-500/50 text-red-300 hover:bg-red-950/30'">{{ confirmDeleteAccount ? '¿Seguro? Toca de nuevo para borrar' : '🗑️ Eliminar cuenta y todo' }}</button>
           </template>
 
           <template v-else-if="tab==='audio'">
@@ -136,6 +136,16 @@ function toggleCoopSetting(key) {
 
           <template v-else-if="tab==='map'">
             <MiniMap :show="true" @close="tab='main'" />
+          </template>
+
+          <template v-else-if="tab==='cuenta'">
+            <button @click="tab='main'" class="text-xs text-white/60 hover:text-white mb-1">‹ Volver</button>
+            <div class="bg-[#1e293b] border-2 border-[#334155] rounded-xl p-3 space-y-3">
+              <div class="text-xs font-black text-white">⚙️ Cuenta y datos</div>
+              <p class="text-[11px] text-white/50 leading-tight">Borra tu cuenta, progreso y mundos locales. No está en el menú principal a propósito.</p>
+              <button @click="handleDeleteAccount" class="w-full py-3 rounded-xl font-bold text-xs border-2 flex items-center justify-center gap-2" :class="confirmDeleteAccount ? 'bg-red-600 border-red-400 text-white animate-pulse' : 'bg-black/30 border-red-500/50 text-red-300 hover:bg-red-950/30'">{{ confirmDeleteAccount ? '¿Seguro? Toca de nuevo para borrar' : '🗑️ Eliminar cuenta y todo' }}</button>
+              <button @click="tab='main'" class="w-full py-2 rounded-full bg-white/10 text-white text-xs">Cancelar</button>
+            </div>
           </template>
         </div>
 

@@ -62,7 +62,7 @@ const isNative = (() => { try { return Capacitor.isNativePlatform() } catch { re
         </button>
       </div>
 
-      <button v-if="isNative" @click="exitApp" class="w-full mt-1 flex items-center justify-center gap-2 bg-black/40 hover:bg-black/60 text-white/70 hover:text-white rounded-xl px-4 py-3 border border-white/10 text-xs font-bold tracking-widest">⏻ SALIR</button>
+      <button @click="exitApp" class="w-full mt-2 flex items-center justify-center gap-2 bg-black/40 hover:bg-black/60 text-white/70 hover:text-white rounded-xl px-4 py-3 border border-white/10 text-xs font-bold tracking-widest">⏻ SALIR DEL JUEGO</button>
 
       <div class="flex items-center gap-1.5 text-[10px] text-white/40 font-mono pt-2 pb-1">
         <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>

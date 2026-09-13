@@ -42,6 +42,7 @@ import CharacterSelect from '@/components/CharacterSelect.vue'
 import { APP_URL } from '@/config.js'
 import { usePerformance } from '@/composables/usePerformance.js'
 import { Capacitor } from '@capacitor/core'
+import MobileMapSlider from '@/components/MobileMapSlider.vue'
 
 const city = useCityStore()
 const player = usePlayerStore()
@@ -534,6 +535,7 @@ onUnmounted(() => {
     <!-- Juego -->
     <template v-else-if="appState==='playing'">
       <CityGrid :show-ui="showUI && !isPaused" class="absolute inset-0 w-full h-full overflow-hidden bg-[#22c55e]" @toggleUi="showUI = !showUI" @openChat="showChat=true" />
+      <MobileMapSlider v-if="!isPaused" />
       <Joystick v-if="joystickType==='thumb'" />
       <DPad v-else />
       <div class="absolute top-2 right-2 z-20 md:hidden bg-black/50 backdrop-blur px-2 py-1 rounded-full text-[10px] text-white/70 border border-white/10 pointer-events-none">JANDOSOFT • {{ activeWorldId ? 'mundo local' : 'offline' }} ✓</div>
