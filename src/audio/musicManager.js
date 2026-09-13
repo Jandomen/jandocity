@@ -13,16 +13,30 @@ const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.
 const isLowEnd = typeof navigator !== 'undefined' && (isAndroid ? ((navigator.deviceMemory || 4) <= 4 || (navigator.hardwareConcurrency || 4) <= 4) : ((navigator.deviceMemory || 4) <= 2 || (navigator.hardwareConcurrency || 4) <= 2)) || !!navigator.connection?.saveData
 const isAndroidLow = isAndroid && isLowEnd
 
+let workletNode = null
+let workletReady = false
+async function ensureWorklet(ctx) {
+  if (workletReady || !isAndroidLow) return
+  try {
+    const url = new URL('./music-worklet.js', import.meta.url)
+    await ctx.audioWorklet.addModule(url)
+    workletReady = true
+  } catch {}
+}
 function getContext() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)()
     gainNode = audioCtx.createGain()
     gainNode.gain.value = 0.34
-    const filter = audioCtx.createBiquadFilter()
-    filter.type = 'lowpass'
-    filter.frequency.value = 2800
-    gainNode.connect(filter)
-    filter.connect(audioCtx.destination)
+    if (!isAndroidLow) {
+      const filter = audioCtx.createBiquadFilter()
+      filter.type = 'lowpass'
+      filter.frequency.value = 2800
+      gainNode.connect(filter)
+      filter.connect(audioCtx.destination)
+    } else {
+      gainNode.connect(audioCtx.destination)
+    }
   }
   return audioCtx
 }
@@ -124,8 +138,10 @@ function scheduleAutoNext() {
 function stopCurrent() {
   clearTimeout(autoTimeout)
   clearTimeout(fadeTimeout)
-  for (const o of currentOscs) try { o.stop(); o.disconnect() } catch {}
+  for (const o of currentOscs) try { o.disconnect(); o.stop?.() } catch {}
   currentOscs = []
+  if (workletNode) try { workletNode.disconnect(); workletNode.port?.close?.() } catch {}
+  workletNode = null
   if (intervalId) clearInterval(intervalId)
   intervalId = null
   if (bassOsc) try { bassOsc.stop(); bassOsc.disconnect() } catch {}
@@ -136,6 +152,21 @@ function playChiptune(track, fromAuto = false) {
   const ctx = getContext()
   if (ctx.state === 'suspended') ctx.resume()
   stopCurrent()
+  // gama baja Android: usa AudioWorklet (hilo de audio, no se corta al caminar)
+  if (isAndroidLow && workletReady && ctx.audioWorklet) {
+    try {
+      workletNode = new AudioWorkletNode(ctx, 'chiptune-processor')
+      workletNode.connect(gainNode)
+      workletNode.port.postMessage({ track, volume: isMuted ? 0 : 0.26 })
+      currentOscs.push(workletNode)
+      gainNode.gain.setValueAtTime(0, ctx.currentTime)
+      gainNode.gain.linearRampToValueAtTime(isMuted ? 0 : 0.26, ctx.currentTime + 0.6)
+      scheduleAutoNext()
+      return
+    } catch {}
+  }
+  // ensure worklet para próxima vez
+  if (isAndroidLow) ensureWorklet(ctx)
   // fade in suave
   if (!fromAuto) {
     gainNode.gain.setValueAtTime(0, ctx.currentTime)
