@@ -152,25 +152,35 @@ function playChiptune(track, fromAuto = false) {
   let step = 0
   let bassStep = 0
 
-  // Bajo continuo — más fuerte en móvil para que se escuche por parlantes chicos
-  bassOsc = ctx.createOscillator()
-  const bassGain = ctx.createGain()
-  bassOsc.type = 'square'
-  bassGain.gain.value = isMobile ? 0.18 : 0.13
-  const bassFilter = ctx.createBiquadFilter()
-  bassFilter.type = 'lowpass'
-  bassFilter.frequency.value = 650
-  bassOsc.connect(bassGain); bassGain.connect(bassFilter); bassFilter.connect(gainNode)
-  currentOscs.push(bassFilter)
-  bassOsc.start()
-  currentOscs.push(bassOsc, bassGain)
+  // Bajo continuo — en gama baja simplificado a sine sin filtro para no trabar al caminar
+  if (!isAndroidLow) {
+    bassOsc = ctx.createOscillator()
+    const bassGain = ctx.createGain()
+    bassOsc.type = 'square'
+    bassGain.gain.value = isMobile ? 0.18 : 0.13
+    const bassFilter = ctx.createBiquadFilter()
+    bassFilter.type = 'lowpass'
+    bassFilter.frequency.value = 650
+    bassOsc.connect(bassGain); bassGain.connect(bassFilter); bassFilter.connect(gainNode)
+    currentOscs.push(bassFilter)
+    bassOsc.start()
+    currentOscs.push(bassOsc, bassGain)
+  } else {
+    // low: bajo sine ligero sin filtro (menos CPU, no se traba al caminar)
+    bassOsc = ctx.createOscillator()
+    const bassGain = ctx.createGain()
+    bassOsc.type = 'sine'
+    bassGain.gain.value = 0.12
+    bassOsc.connect(bassGain); bassGain.connect(gainNode)
+    bassOsc.start()
+    currentOscs.push(bassOsc, bassGain)
+  }
 
   // ===== WEB AUDIO LOOK-AHEAD SCHEDULER =====
-  // Programa notas en el timeline de AudioContext.
-  // Si JS se pausa (throttle), las notas ya están programadas en el audio timeline.
+  // En gama baja aumentamos look-ahead para que aunque JS se trabe al caminar, las notas ya estén programadas
   let nextNoteTime = ctx.currentTime + 0.05
-  const LOOK_AHEAD = isMobile ? 0.1 : 0.15
-  const SCHEDULE_INTERVAL = isMobile ? 75 : 50
+  const LOOK_AHEAD = isAndroidLow ? 0.4 : (isMobile ? 0.15 : 0.18)
+  const SCHEDULE_INTERVAL = isAndroidLow ? 150 : (isMobile ? 75 : 50)
   let _stopFlag = false
 
   stopCurrent = () => {
@@ -191,22 +201,25 @@ function playChiptune(track, fromAuto = false) {
     const gain = ctx.createGain()
     osc.type = 'square'
     osc.frequency.value = freq
-    // Volumen uniforme — sin random para evitar ruido
-    const vel = 0.32 + (step % 4 === 0 ? 0.04 : 0)
+    const vel = isAndroidLow ? 0.26 : (0.32 + (step % 4 === 0 ? 0.04 : 0))
     gain.gain.setValueAtTime(0, audioTime)
     gain.gain.linearRampToValueAtTime(vel, audioTime + 0.008)
     gain.gain.exponentialRampToValueAtTime(0.02, audioTime + tickSec * 0.85)
-    // SIEMPRE lowpass filter — igual que web
-    const filt = ctx.createBiquadFilter()
-    filt.type = 'lowpass'
-    filt.frequency.value = track.mood === 'Noche' || track.mood === 'Tristeza' ? 1800 : 2600 + (step % 8 === 0 ? 400 : 0)
-    osc.connect(gain); gain.connect(filt); filt.connect(gainNode)
-    currentOscs.push(filt)
+    if (isAndroidLow) {
+      // low: sin filtro (ahorra Biquad por nota = no se traba al caminar)
+      osc.connect(gain); gain.connect(gainNode)
+    } else {
+      const filt = ctx.createBiquadFilter()
+      filt.type = 'lowpass'
+      filt.frequency.value = track.mood === 'Noche' || track.mood === 'Tristeza' ? 1800 : 2600 + (step % 8 === 0 ? 400 : 0)
+      osc.connect(gain); gain.connect(filt); filt.connect(gainNode)
+      currentOscs.push(filt)
+    }
     osc.start(audioTime)
     osc.stop(audioTime + tickSec + 0.01)
     currentOscs.push(osc, gain)
-    // Cleanup gentle — no splicear nodos que aún suenan
-    while (currentOscs.length > 30) {
+    // Cleanup — más agresivo en low para no acumular nodos al caminar
+    while (currentOscs.length > (isAndroidLow ? 18 : 30)) {
       const old = currentOscs.shift()
       try { old.disconnect() } catch {}
     }
