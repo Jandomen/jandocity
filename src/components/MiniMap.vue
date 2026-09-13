@@ -222,26 +222,19 @@ watch(() => [camera.x.value, camera.y.value, player.x, player.y], draw)
       </div>
       <div class="flex-1 overflow-auto p-3 flex items-center justify-center bg-[#0f172a] gap-2">
         <canvas ref="canvasRef" @click="handleCanvasClick" @mousemove="handleCanvasMove" @mouseleave="hoverPos=null; draw()" class="max-w-[90vw] max-h-[75vh] md:max-w-full md:max-h-[60vh] w-auto h-auto border border-white/10 rounded shadow" :class="isTargeting ? 'cursor-crosshair ring-2 ring-red-500' : 'cursor-default'" style="image-rendering: pixelated; width: min(85vw, 400px); height: min(85vw, 400px);"></canvas>
-        <!-- Deslizador vertical/horizontal solo en pausa (no targeting) — toca para navegar el perímetro -->
-        <div v-if="!isTargeting" class="hidden md:flex flex-col items-center gap-1 bg-black/40 border border-white/10 rounded-full p-1.5">
+        <!-- Y vertical al lado del canvas — X/Y lateral, no doble barra -->
+        <div v-if="!isTargeting" class="flex flex-col items-center gap-1 bg-black/40 border border-white/10 rounded-full p-1.5 shrink-0">
           <span class="text-[7px] text-white/40 font-black">↑ N</span>
-          <input type="range" orient="vertical" min="0" max="100" :value="sliderY" @input="onSliderY" class="w-6 h-[220px] accent-white" style="writing-mode: bt-lr; -webkit-appearance: slider-vertical;" />
+          <input type="range" orient="vertical" min="0" max="100" :value="sliderY" @input="onSliderY" class="w-6 h-[160px] md:h-[220px] accent-white" style="writing-mode: bt-lr; -webkit-appearance: slider-vertical;" />
           <span class="text-[7px] text-white/40 font-black">S ↓</span>
         </div>
       </div>
-      <!-- Sliders móviles / pausa — horizontales + centrar -->
-      <div v-if="!isTargeting" class="shrink-0 px-3 py-2 bg-black/30 border-t border-white/10 flex flex-col gap-1.5 md:hidden">
-        <div class="flex items-center gap-2">
-          <span class="text-[8px] text-white/50 font-black">◀ O</span>
-          <input type="range" min="0" max="100" :value="sliderX" @input="onSliderX" class="flex-1 accent-white h-1" />
-          <span class="text-[8px] text-white/50 font-black">E ▶</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="text-[8px] text-white/50 font-black">↑ N</span>
-          <input type="range" min="0" max="100" :value="sliderY" @input="onSliderY" class="flex-1 accent-white h-1" />
-          <span class="text-[8px] text-white/50 font-black">S ↓</span>
-        </div>
-        <button @click="centerOnPlayer" class="py-1.5 rounded-full bg-white/10 border border-white/15 text-white text-[10px] font-bold">⌖ Centrar en ti (rojo)</button>
+      <!-- X horizontal abajo — solo X, Y ya está al lado -->
+      <div v-if="!isTargeting" class="shrink-0 px-3 py-2 bg-black/30 border-t border-white/10 flex items-center gap-2 md:hidden">
+        <span class="text-[8px] text-white/50 font-black">◀ O</span>
+        <input type="range" min="0" max="100" :value="sliderX" @input="onSliderX" class="flex-1 accent-white h-1" />
+        <span class="text-[8px] text-white/50 font-black">E ▶</span>
+        <button @click="centerOnPlayer" class="ml-2 px-2.5 py-1 rounded-full bg-white/10 border border-white/15 text-white text-[9px] font-bold whitespace-nowrap">⌖</button>
       </div>
       <div v-if="!isTargeting" class="hidden md:flex shrink-0 px-3 py-1.5 bg-black/30 border-t border-white/10 items-center gap-2">
         <span class="text-[8px] text-white/50 font-black">◀ O</span>
