@@ -436,8 +436,15 @@ onMounted(async () => {
     // si quedan 2 y se va uno, el otro gana ya manejado arriba (1)
     // si quedan >2, sigue
   })
-  // OTA DESHABILITADO — causaba restarts infinitos en APK
-  // Para re-habilitar: ver useAutoUpdater.js
+  // OTA controlado — Capgo con throttle 30min, no reinicia inmediato, solo al próximo cold start
+  try {
+    const { useAutoUpdater } = await import('@/composables/useAutoUpdater.js')
+    const updater = useAutoUpdater()
+    updater.listenOnline()
+    // chequeo inicial 5s tras splash si hay internet (evita el loop de 3s)
+    if (navigator.onLine) setTimeout(() => updater.checkAndUpdate(), 5000)
+    window.__jandocityUpdater = updater
+  } catch {}
   // Splash 2s
   setTimeout(() => { appState.value = 'menu' }, 2000)
 
