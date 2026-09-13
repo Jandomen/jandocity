@@ -1,5 +1,19 @@
 <script setup>
+import { Capacitor } from '@capacitor/core'
 const emit = defineEmits(['select'])
+async function exitApp() {
+  try {
+    if (Capacitor.isNativePlatform()) {
+      try { window.Capacitor?.Plugins?.App?.exitApp?.(); return } catch {}
+      try { navigator.app?.exitApp?.(); return } catch {}
+      // fallback: minimiza con back
+      try { history.back() } catch {}
+      return
+    }
+    window.close()
+  } catch { try { window.close() } catch {} }
+}
+const isNative = (() => { try { return Capacitor.isNativePlatform() } catch { return /Android/i.test(navigator.userAgent||'') } })()
 </script>
 
 <template>
@@ -47,6 +61,8 @@ const emit = defineEmits(['select'])
           <span class="w-7 h-7 rounded-full bg-white text-[#581c87] flex items-center justify-center font-black text-sm">›</span>
         </button>
       </div>
+
+      <button v-if="isNative" @click="exitApp" class="w-full mt-1 flex items-center justify-center gap-2 bg-black/40 hover:bg-black/60 text-white/70 hover:text-white rounded-xl px-4 py-3 border border-white/10 text-xs font-bold tracking-widest">⏻ SALIR</button>
 
       <div class="flex items-center gap-1.5 text-[10px] text-white/40 font-mono pt-2 pb-1">
         <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
