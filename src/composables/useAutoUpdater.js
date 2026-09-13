@@ -45,7 +45,8 @@ function compareVersions(a, b) {
 
 export function useAutoUpdater() {
   async function checkAndUpdate(force = false) {
-    // No auto-descarga más: solo avisa si hay update
+    // Solo APK nativo pide actualización — en web Vercel ya sirve la última, no molestar
+    if (!Capacitor.isNativePlatform()) return { skipped: 'web' }
     if (!navigator.onLine) return { skipped: 'offline' }
     if (!force && !canCheck()) return { skipped: 'throttled' }
 
@@ -190,6 +191,7 @@ export function useAutoUpdater() {
   }
 
   function listenOnline() {
+    if (!Capacitor.isNativePlatform()) return
     let debounce = null
     window.addEventListener('online', () => {
       clearTimeout(debounce)
