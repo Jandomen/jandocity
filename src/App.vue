@@ -54,6 +54,19 @@ const isNative = computed(() => {
   if (location.protocol === 'capacitor:' || location.href.includes('capacitor://')) return true
   return false
 })
+const containerStyle = computed(() => {
+  // Nativo: Android ya aplica WindowInsets via MainActivity (decorFitsSystemWindows=true) + status/navigation bars opacas.
+  // No usar env fallback 24/48 aquí para no duplicar padding y evitar que quede debajo de los 3 botones.
+  if (isNative.value) return {}
+  // Web/iOS: usa env(safe-area) con viewport-fit=cover
+  return {
+    paddingTop: 'env(safe-area-inset-top, 0px)',
+    paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+    paddingLeft: 'env(safe-area-inset-left, 0px)',
+    paddingRight: 'env(safe-area-inset-right, 0px)'
+  }
+})
+const resourceBarTop = computed(() => isNative.value ? '0px' : 'env(safe-area-inset-top, 0px)')
 // fuerza clase global para CSS nativo (aunque sea tablet landscape 1280px) — exhaustivo
 function applyNativeClass() { try { document.documentElement.classList.toggle('is-native', !!isNative.value); document.body?.classList.toggle('is-native', !!isNative.value) } catch {} }
 watch(isNative, applyNativeClass, { immediate: true })
@@ -509,8 +522,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <!-- Ventana normal con barras sistema visibles — safe-area con fallback 24/48px para Android sin env() -->
-  <div class="relative w-screen h-[100dvh] h-screen overflow-hidden bg-[#0f172a] text-slate-100 font-sans antialiased" style="padding-top: env(safe-area-inset-top, 24px); padding-bottom: env(safe-area-inset-bottom, 48px); padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px);">
+  <!-- Ventana contenida: en nativo el padding lo pone Android (WindowInsets, no overlay), en web usa env(safe-area) -->
+  <div class="relative w-screen h-[100dvh] overflow-hidden bg-[#0f172a] text-slate-100 font-sans antialiased" :style="containerStyle">
     <OfflineBanner />
     <!-- Splash 2s -->
     <SplashScreen v-if="appState==='splash'" />
@@ -537,10 +550,9 @@ onUnmounted(() => {
       <CityGrid :show-ui="showUI && !isPaused" class="absolute inset-0 w-full h-full overflow-hidden bg-[#22c55e]" @toggleUi="showUI = !showUI" @openChat="showChat=true" />
       <Joystick v-if="joystickType==='thumb'" />
       <DPad v-else />
-      <div class="absolute top-2 right-2 z-20 md:hidden bg-black/50 backdrop-blur px-2 py-1 rounded-full text-[10px] text-white/70 border border-white/10 pointer-events-none">JANDOSOFT • {{ activeWorldId ? 'mundo local' : 'offline' }} ✓</div>
 
       <Transition name="fade">
-        <ResourceBar v-show="showUI" class="absolute left-0 right-0 z-30" style="top: env(safe-area-inset-top, 24px);" />
+        <ResourceBar v-show="showUI" class="absolute left-0 right-0 z-30" :style="{ top: resourceBarTop }" />
       </Transition>
 
       <!-- Botón pausa + mute separado + chat T -->
