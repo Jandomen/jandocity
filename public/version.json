@@ -1,5 +1,5 @@
 {
-  "version": "0.1.24",
-  "url": "https://adqhqvzkqdhujjipabgf.supabase.co/storage/v1/object/public/updates/jandocity-0.1.24.zip",
-  "notes": "OTA 0.1.24 - no fullscreen, muestra barras sistema + boton salir"
+  "version": "0.1.25",
+  "url": "https://adqhqvzkqdhujjipabgf.supabase.co/storage/v1/object/public/updates/jandocity-0.1.25.zip",
+  "notes": "OTA 0.1.25 - ventana normal con safe-area, no tapa barras"
 }
