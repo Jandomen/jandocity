@@ -544,12 +544,13 @@ onUnmounted(() => {
         <ResourceBar v-show="showUI" class="absolute left-0 right-0 z-30" style="top: env(safe-area-inset-top, 24px);" />
       </Transition>
 
-      <!-- Botón pausa (Esc) + chat T -->
+      <!-- Botón pausa + mute separado + chat T -->
       <div class="absolute top-[42px] md:top-[40px] right-2 z-30 flex items-center gap-1.5">
         <button @click="showChat=true" class="hidden md:flex px-2.5 py-1 rounded-full bg-sky-600/80 backdrop-blur border border-white/15 text-[11px] text-white hover:bg-sky-600 gap-1 items-center">💬 Chat <span class="bg-white text-sky-700 px-1 rounded text-[9px] font-black">T</span></button>
+        <button @click="audioMgr.music.isMuted ? audioMgr.music.unmute(0.34) : audioMgr.music.mute()" class="px-2.5 py-1 rounded-full backdrop-blur border text-[11px] hover:bg-black/70 flex items-center gap-1" :class="audioMgr.music.isMuted ? 'bg-red-600/80 border-white/15 text-white' : 'bg-black/60 border-white/15 text-white/80'">{{ audioMgr.music.isMuted ? '🔇' : '🔊' }} <span class="hidden md:inline">{{ audioMgr.music.isMuted ? 'Mute' : 'Sonido' }}</span></button>
         <button @click="togglePause" class="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur border border-white/15 text-[11px] text-white/80 hover:bg-black/70">{{ isPaused ? '▶' : '⏸' }} <span class="hidden md:inline">Pausa (Esc)</span><span class="md:hidden">Pausa</span></button>
       </div>
-      <!-- Now playing — debajo del botón pausa, visible en móvil y web -->
+      <!-- Now playing — debajo de pausa/mute, visible en móvil y web -->
       <div v-if="audioMgr.music.currentTrack && appState==='playing' && showUI" class="absolute top-[66px] md:top-[64px] right-2 z-30 pointer-events-none">
         <div class="bg-black/50 backdrop-blur-sm border border-white/10 rounded-full px-2.5 py-1 flex items-center gap-1.5">
           <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
