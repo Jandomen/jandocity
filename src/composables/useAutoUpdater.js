@@ -13,7 +13,6 @@ const FAILED_KEY = 'jandocity-failed-version'
 const DISMISSED_KEY = 'jandocity-dismissed-version'
 
 function canCheck() {
-  if (!Capacitor.isNativePlatform()) return true // web also can check manifest for prompt
   if (!navigator.onLine) return false
   try {
     const last = parseInt(localStorage.getItem(LAST_CHECK_KEY) || '0', 10)
@@ -29,7 +28,7 @@ async function getCurrentVersion() {
     if (cur?.bundle?.version) return cur.bundle.version
     if (cur?.version) return cur.version
   } catch {}
-  try { return localStorage.getItem(APPLIED_KEY) || '0.1.30' } catch { return '0.1.30' }
+  try { return localStorage.getItem(APPLIED_KEY) || '0.1.32' } catch { return '0.1.32' }
 }
 
 function compareVersions(a, b) {
@@ -89,7 +88,7 @@ export function useAutoUpdater() {
       for (const c of candidates) {
         if (compareVersions(c.version, currentVer) <= 0) continue
         const dismissed = localStorage.getItem(DISMISSED_KEY)
-        if (dismissed === c.version && !force) continue
+        if (dismissed === c.version) continue // respeta "Más tarde" aun con force, hasta nueva versión
         const failed = localStorage.getItem(FAILED_KEY)
         if (failed === c.version) continue
         const applied = localStorage.getItem(APPLIED_KEY)
@@ -125,10 +124,11 @@ export function useAutoUpdater() {
       await new Promise(r => setTimeout(r, 280))
       progress.value = 45
       await new Promise(r => setTimeout(r, 250))
+      try { localStorage.setItem(APPLIED_KEY, upd.version); localStorage.removeItem(DISMISSED_KEY); localStorage.removeItem(FAILED_KEY) } catch {}
       progress.value = 100
       status.value = 'ready'
-      // recarga suave tras 800ms
-      setTimeout(() => window.location.reload(), 800)
+      // recarga suave tras 700ms — después el check verá applied === remote y no volverá a molestar
+      setTimeout(() => window.location.reload(), 700)
       return { updated: true, web: true }
     }
 

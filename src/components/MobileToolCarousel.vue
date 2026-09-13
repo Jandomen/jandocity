@@ -1,16 +1,52 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useCityStore } from '@/stores/cityStore.js'
 import { useSinglePlayerStore } from '@/stores/singlePlayerStore.js'
 import { useUnitQueue } from '@/composables/useUnitQueue.js'
 import { BUILDINGS } from '@/constants/buildings.js'
+import { usePerformance } from '@/composables/usePerformance.js'
 
 defineProps({ showUI: { type: Boolean, default: true } })
 
 const city = useCityStore()
 const single = useSinglePlayerStore()
 const unitQueue = useUnitQueue()
+const perf = usePerformance()
 const selected = ref(null)
+
+// algoritmo ligero: cachea hasPolice/Mil/Ars con throttle 1.5s para no escanear 22k celdas en cada render (abrir menú instantáneo)
+const hasPoliceCache = ref(false)
+const hasMilCache = ref(false)
+const hasArsCache = ref(false)
+function refreshUnlocks() {
+  const tick = city.tickCount
+  void tick
+  const pid = single.humanPlayer()?.id
+  if (!pid) { hasPoliceCache.value=false; hasMilCache.value=false; hasArsCache.value=false; return }
+  // escaneo único O(n) cada 1.5s en vez de 3× por render
+  let p=false,m=false,a=false
+  for (const c of city.flatGrid) {
+    if (!c.isOrigin || c.owner!==pid) continue
+    if (!p && c.buildingId==='police_station') p=true
+    if (!m && c.buildingId==='military_academy') m=true
+    if (!a && c.buildingId==='arsenal') a=true
+    if (p&&m&&a) break
+  }
+  hasPoliceCache.value=p; hasMilCache.value=m; hasArsCache.value=a
+}
+let refreshTimer=null
+onMounted(()=>{ refreshUnlocks(); refreshTimer=setInterval(refreshUnlocks,1500) })
+onUnmounted(()=> clearInterval(refreshTimer))
+watch(()=>city.tickCount, refreshUnlocks)
+watch(()=>selected.value, refreshUnlocks)
+const hasPolice = computed(()=> hasPoliceCache.value)
+const hasMil = computed(()=> hasMilCache.value)
+const hasArs = computed(()=> hasArsCache.value)
+
+// items estáticos fuera del template para no recrear arrays en cada render (algoritmo O(1) render)
+const ZONAS_SMALL=[{id:'residential',label:'Normal',icon:'🏠',cost:BUILDINGS.residential.cost,sub:'1×1'},{id:'residential_small',label:'Pequeña',icon:'🏠',cost:BUILDINGS.residential_small.cost,sub:'8 hab'},{id:'residential_medium',label:'Mediana',icon:'🏡',cost:BUILDINGS.residential_medium.cost,sub:'14 hab'},{id:'residential_large',label:'Grande',icon:'🏘️',cost:BUILDINGS.residential_large.cost,sub:'28 hab 2×2'}]
+const ZONAS_COM=[{id:'commercial',label:'Comercial',icon:'🏪',cost:BUILDINGS.commercial.cost,sub:'+18💰/tick'},{id:'shop',label:'Tienda',icon:'🛒',cost:BUILDINGS.shop.cost,sub:'+12💰'},{id:'supermarket',label:'Super',icon:'🛍️',cost:BUILDINGS.supermarket.cost,sub:'+24💰 2×2'},{id:'mall',label:'Mall',icon:'🏬',cost:BUILDINGS.mall.cost,sub:'+36💰 3×2'},{id:'bank',label:'Banco',icon:'🏦',cost:BUILDINGS.bank.cost,sub:'+28💰 2×1'},{id:'park',label:'Parque',icon:'🌳',cost:BUILDINGS.park.cost,sub:'+10 O₂ 2×2'}]
+
 
 const roadVariants = [
   { id: 'straight-h', label: 'Recta H', icon: '━' },
@@ -72,9 +108,6 @@ const categories = computed(() => {
   if (single.isActive) return [{ id: 'produccion', label: 'Prod.', icon: '⚔️' }, ...baseCategories]
   return baseCategories
 })
-const hasPolice = computed(() => city.flatGrid.some(c=>c.isOrigin && c.buildingId==='police_station' && c.owner===single.humanPlayer()?.id))
-const hasMil = computed(() => city.flatGrid.some(c=>c.isOrigin && c.buildingId==='military_academy' && c.owner===single.humanPlayer()?.id))
-const hasArs = computed(() => city.flatGrid.some(c=>c.isOrigin && c.buildingId==='arsenal' && c.owner===single.humanPlayer()?.id))
 
 function open(cat) { selected.value = selected.value === cat ? null : cat }
 function close() { selected.value = null }
@@ -104,9 +137,9 @@ function pick(toolId) {
       </div>
     </Transition>
 
-    <!-- Modal centrado — cuadrote con X inferior para cerrar -->
+    <!-- Modal centrado — cuadrote con X inferior para cerrar (sin blur en móvil/perf-low para abrir instantáneo) -->
     <Transition name="fade">
-      <div v-if="selected" class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3" @click.self="close">
+      <div v-if="selected" class="fixed inset-0 z-40 flex items-center justify-center p-3" :class="perf.isLowEnd.value ? 'bg-black/70' : 'bg-black/60 backdrop-blur-sm'" @click.self="close">
         <div class="bg-slate-900 rounded-2xl border border-white/10 w-full max-w-[390px] max-h-[74vh] flex flex-col overflow-hidden shadow-[0_16px_48px_rgba(0,0,0,0.6)]">
           <!-- header -->
           <div class="shrink-0 flex items-center justify-between px-3 py-2 border-b border-white/10 bg-slate-800/60">
@@ -153,27 +186,15 @@ function pick(toolId) {
               </div>
             </template>
 
-            <!-- ZONAS -->
+            <!-- ZONAS (algoritmo estático para render O(1)) -->
             <template v-if="selected==='zonas'">
               <div class="grid grid-cols-2 gap-1.5">
-                <button v-for="v in [
-                  { id: 'residential', label: 'Normal', icon: '🏠', cost: BUILDINGS.residential.cost, sub: '1×1' },
-                  { id: 'residential_small', label: 'Pequeña', icon: '🏠', cost: BUILDINGS.residential_small.cost, sub: '8 hab' },
-                  { id: 'residential_medium', label: 'Mediana', icon: '🏡', cost: BUILDINGS.residential_medium.cost, sub: '14 hab' },
-                  { id: 'residential_large', label: 'Grande', icon: '🏘️', cost: BUILDINGS.residential_large.cost, sub: '28 hab 2×2' },
-                ]" :key="v.id" @click="pick(v.id); city.selectedHouseVariant=v.id" class="p-2 rounded border text-xs text-left flex flex-col gap-0.5" :class="city.selectedTool===v.id ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 ring-1 ring-emerald-500' : 'bg-slate-800 border-slate-700 text-white/70'">
+                <button v-for="v in ZONAS_SMALL" :key="v.id" @click="pick(v.id); city.selectedHouseVariant=v.id" class="p-2 rounded border text-xs text-left flex flex-col gap-0.5" :class="city.selectedTool===v.id ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 ring-1 ring-emerald-500' : 'bg-slate-800 border-slate-700 text-white/70'">
                   <div class="flex items-center gap-1.5"><span>{{ v.icon }}</span><span class="font-semibold text-[11px]">{{ v.label }}</span><span class="ml-auto text-[10px] font-mono text-emerald-400">${{ v.cost }}</span></div><div class="text-[9px] opacity-60">{{ v.sub }}</div>
                 </button>
               </div>
               <div class="grid grid-cols-2 gap-1.5">
-                <button v-for="tool in [
-                  { id: 'commercial', label: 'Comercial', icon: '🏪', cost: BUILDINGS.commercial.cost, sub: '+18💰/tick' },
-                  { id: 'shop', label: 'Tienda', icon: '🛒', cost: BUILDINGS.shop.cost, sub: '+12💰' },
-                  { id: 'supermarket', label: 'Super', icon: '🛍️', cost: BUILDINGS.supermarket.cost, sub: '+24💰 2×2' },
-                  { id: 'mall', label: 'Mall', icon: '🏬', cost: BUILDINGS.mall.cost, sub: '+36💰 3×2' },
-                  { id: 'bank', label: 'Banco', icon: '🏦', cost: BUILDINGS.bank.cost, sub: '+28💰 2×1' },
-                  { id: 'park', label: 'Parque', icon: '🌳', cost: BUILDINGS.park.cost, sub: '+10 O₂ 2×2' },
-                ]" :key="tool.id" @click="pick(tool.id)" class="p-2 rounded border text-xs text-left" :class="city.selectedTool===tool.id ? 'bg-blue-500/20 border-blue-500 text-blue-300 ring-1 ring-blue-500' : 'bg-slate-800 border-slate-700 text-white/70'">
+                <button v-for="tool in ZONAS_COM" :key="tool.id" @click="pick(tool.id)" class="p-2 rounded border text-xs text-left" :class="city.selectedTool===tool.id ? 'bg-blue-500/20 border-blue-500 text-blue-300 ring-1 ring-blue-500' : 'bg-slate-800 border-slate-700 text-white/70'">
                   <div class="flex items-center gap-1.5"><span>{{ tool.icon }}</span><span class="font-semibold text-[11px]">{{ tool.label }}</span><span class="ml-auto text-[10px] font-mono text-sky-400">${{ tool.cost }}</span></div><div class="text-[9px] opacity-60">{{ tool.sub }}</div>
                 </button>
               </div>
