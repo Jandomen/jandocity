@@ -1,9 +1,11 @@
 <script setup>
 import { computed } from 'vue'
+import { Capacitor } from '@capacitor/core'
 import { useAutoUpdater } from '@/composables/useAutoUpdater.js'
 
 const updater = useAutoUpdater()
-const show = computed(() => ['available','downloading','ready','error'].includes(updater.status.value) && !!updater.pendingUpdate.value)
+const isNative = computed(() => { try { return Capacitor.isNativePlatform() } catch { return false } })
+const show = computed(() => isNative.value && ['available','downloading','ready','error'].includes(updater.status.value) && !!updater.pendingUpdate.value)
 const title = computed(() => {
   if (updater.status.value === 'downloading') return 'Descargando actualización…'
   if (updater.status.value === 'ready') return '¡Actualización lista!'

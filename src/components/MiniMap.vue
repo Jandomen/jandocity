@@ -220,12 +220,12 @@ watch(() => [camera.x.value, camera.y.value, player.x, player.y], draw)
         <span class="animate-pulse">●</span>
         <span>Selecciona en el mapa dónde caerá el ataque. El suelo quedará <b class="text-white">gris con escombros</b> hasta que vuelva el pasto (12s → tierra, 37s → pasto).</span>
       </div>
-      <div class="flex-1 overflow-auto p-3 flex items-center justify-center bg-[#0f172a] gap-2">
-        <canvas ref="canvasRef" @click="handleCanvasClick" @mousemove="handleCanvasMove" @mouseleave="hoverPos=null; draw()" class="max-w-[90vw] max-h-[75vh] md:max-w-full md:max-h-[60vh] w-auto h-auto border border-white/10 rounded shadow" :class="isTargeting ? 'cursor-crosshair ring-2 ring-red-500' : 'cursor-default'" style="image-rendering: pixelated; width: min(85vw, 400px); height: min(85vw, 400px);"></canvas>
-        <!-- Y vertical al lado del canvas — X/Y lateral, no doble barra -->
-        <div v-if="!isTargeting" class="flex flex-col items-center gap-1 bg-black/40 border border-white/10 rounded-full p-1.5 shrink-0">
+      <div class="flex-1 min-h-0 overflow-hidden p-2 sm:p-3 flex items-center justify-center bg-[#0f172a] gap-2">
+        <canvas ref="canvasRef" @click="handleCanvasClick" @mousemove="handleCanvasMove" @mouseleave="hoverPos=null; draw()" class="w-full h-auto aspect-square border border-white/10 rounded shadow shrink min-w-0" :class="isTargeting ? 'cursor-crosshair ring-2 ring-red-500' : 'cursor-default'" style="image-rendering: pixelated; max-width: min(72vw, 340px); max-height: min(54vh, 340px);"></canvas>
+        <!-- Y vertical al lado del canvas — X/Y lateral, ocupa toda la altura disponible sin tapar mapa -->
+        <div v-if="!isTargeting" class="flex flex-col items-center gap-1 bg-black/40 border border-white/10 rounded-full p-1.5 shrink-0 self-center">
           <span class="text-[7px] text-white/40 font-black">↑ N</span>
-          <input type="range" orient="vertical" min="0" max="100" :value="sliderY" @input="onSliderY" class="w-6 h-[160px] md:h-[220px] accent-white" style="writing-mode: bt-lr; -webkit-appearance: slider-vertical;" />
+          <input type="range" orient="vertical" min="0" max="100" :value="sliderY" @input="onSliderY" class="w-6 h-[120px] sm:h-[140px] md:h-[220px] accent-white shrink-0" style="writing-mode: bt-lr; -webkit-appearance: slider-vertical;" />
           <span class="text-[7px] text-white/40 font-black">S ↓</span>
         </div>
       </div>
