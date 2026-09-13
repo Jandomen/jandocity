@@ -630,19 +630,18 @@ export const useCityStore = defineStore('city', () => {
   const REMOTE_RADIUS = { rocket: 1, missile: 2, atomic: 3, atomic_heavy: 5 }
   const REMOTE_COST = { rocket: 50, missile: 200, atomic: 500, atomic_heavy: 850 }
   const REMOTE_DAMAGE = { rocket: 65, missile: 120, atomic: 300, atomic_heavy: 520 }
-  function remoteStrike(targetX, targetY, weaponId) {
+  function remoteStrike(targetX, targetY, weaponId, playerId = null) {
     const radius = REMOTE_RADIUS[weaponId] ?? 1
     const cost = REMOTE_COST[weaponId] ?? 50
     const damage = REMOTE_DAMAGE[weaponId] ?? 65
-    if (money.value < cost) return { ok: false, reason: `Fondos insuficientes (${cost}💰)` }
-    const startX = targetX - radius
-    const endX = targetX + radius
-    const startY = targetY - radius
-    const endY = targetY + radius
-    // asegura que el área exista expandiendo grid si el tiro es fuera
-    ensureGridContains(startX, startY)
-    ensureGridContains(endX, endY)
-    money.value -= cost
+    if (playerId) {
+      const single = useSinglePlayerStore()
+      if (!single.canAfford(playerId, cost)) return { ok: false, reason: `Fondos insuficientes (${cost}💰)` }
+      single.deduct(playerId, cost)
+    } else {
+      if (money.value < cost) return { ok: false, reason: `Fondos insuficientes (${cost}💰)` }
+      money.value -= cost
+    }
     let destroyed = 0
     const rubbleCells = []
     // Flash atómico si es atomic_* — pesada naranja + casi negro

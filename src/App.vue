@@ -58,6 +58,7 @@ const isPaused = ref(false)
 const joystickType = ref(localStorage.getItem('jandocity-joystick') || 'thumb')
 const showChat = ref(false)
 const single = useSinglePlayerStore()
+window.__cityStore = city // exposición para useCamera pan check
 const buildQueue = useBuildQueue()
 const unitQueue = useUnitQueue()
 const singleAI = useSingleAI()
@@ -518,6 +519,13 @@ onUnmounted(() => {
       <div class="absolute top-[42px] md:top-[40px] right-2 z-30 flex items-center gap-1.5">
         <button @click="showChat=true" class="hidden md:flex px-2.5 py-1 rounded-full bg-sky-600/80 backdrop-blur border border-white/15 text-[11px] text-white hover:bg-sky-600 gap-1 items-center">💬 Chat <span class="bg-white text-sky-700 px-1 rounded text-[9px] font-black">T</span></button>
         <button @click="togglePause" class="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur border border-white/15 text-[11px] text-white/80 hover:bg-black/70">{{ isPaused ? '▶' : '⏸' }} Pausa (Esc)</button>
+      </div>
+      <!-- Now playing — debajo del botón pausa, visible en móvil y web -->
+      <div v-if="audioMgr.music.currentTrack && appState==='playing' && showUI" class="absolute top-[66px] md:top-[64px] right-2 z-30 pointer-events-none">
+        <div class="bg-black/50 backdrop-blur-sm border border-white/10 rounded-full px-2.5 py-1 flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="text-[9px] md:text-[10px] text-white/70 font-medium truncate max-w-[120px] md:max-w-[200px]">🎵 {{ audioMgr.music.currentMood }}</span>
+        </div>
       </div>
 
       <!-- Desktop: panel izquierdo -->

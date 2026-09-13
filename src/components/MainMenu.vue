@@ -50,7 +50,7 @@ const emit = defineEmits(['select'])
 
       <div class="flex items-center gap-1.5 text-[10px] text-white/40 font-mono pt-2 pb-1">
         <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-        <span>JANDOSOFT • v2.0</span>
+        <span>@2026 JANDOSOFT</span>
       </div>
     </div>
   </div>

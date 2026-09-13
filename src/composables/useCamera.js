@@ -8,10 +8,9 @@ import { ref, computed } from 'vue'
 export function useCamera() {
   const x = ref(0)
   const y = ref(0)
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
-  const scale = ref(isMobile ? 0.78 : 1)
+  const scale = ref(1)
 
-  const MIN_SCALE = isMobile ? 0.45 : 0.6
+  const MIN_SCALE = 0.6
   const MAX_SCALE = 2.2
 
   let isDragging = false
@@ -22,13 +21,29 @@ export function useCamera() {
 
   const transform = computed(() => `translate(${x.value}px, ${y.value}px) scale(${scale.value})`)
 
+  // Callback externo para que CityGrid sepa si hay pan activo
+  let _onPanStart = null
+  let _onPanEnd = null
+  function setPanCallbacks(onStart, onEnd) { _onPanStart = onStart; _onPanEnd = onEnd }
+
   function onPointerDown(e) {
-    // Pan solo con derecho (2) o central (1) — izquierdo (0) es para pintar como Minecraft
+    // Desktop: pan con derecho (2) o central (1)
+    // Móvil: pan con touch (1 dedo) cuando NO hay herramienta seleccionada
     const isPanButton = e.button === 2 || e.button === 1
-    const isTouch = e.touches !== undefined
+    const isTouch = e.pointerType === 'touch' || e.touches !== undefined
+    const isLeftClick = e.button === 0 || e.button === undefined
     if (!isPanButton && !isTouch) return
+    // En móvil con touch, solo pan si no hay tool (pintar requiere tool)
+    if (isTouch && !isPanButton && isLeftClick) {
+      // Si hay tool activo, no panear — pintar
+      try {
+        const city = window.__cityStore || null
+        if (city && city.selectedTool && city.selectedTool !== 'demolish') return
+      } catch {}
+    }
     if (e.button === 2) e.preventDefault()
     isDragging = true
+    if (_onPanStart) _onPanStart()
     const p = e.touches ? e.touches[0] : e
     lastX = p.clientX
     lastY = p.clientY
@@ -48,10 +63,9 @@ export function useCamera() {
   function onPointerUp(e) {
     if (!isDragging) return
     const p = e.changedTouches ? e.changedTouches[0] : e
-    // Si fue un click sin apenas movimiento, no consumir el evento (dejar que CellTile reciba click)
     const moved = Math.hypot((p.clientX - startX), (p.clientY - startY))
     isDragging = false
-    // Devolver si fue drag para que el click de construcción no se dispare tras pan
+    if (_onPanEnd) _onPanEnd(moved > 6)
     return moved > 6
   }
 

@@ -136,7 +136,7 @@ function playChiptune(track, fromAuto = false) {
   const ctx = getContext()
   if (ctx.state === 'suspended') ctx.resume()
   stopCurrent()
-  // fade in suave para no entrar de sopetón
+  // fade in suave
   if (!fromAuto) {
     gainNode.gain.setValueAtTime(0, ctx.currentTime)
     gainNode.gain.linearRampToValueAtTime(isMuted ? 0 : 0.34, ctx.currentTime + 1.4)
@@ -146,126 +146,116 @@ function playChiptune(track, fromAuto = false) {
   }
   scheduleAutoNext()
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
-  const tick = isAndroidLow ? 60000 / track.bpm / 1 : isMobile ? 60000 / track.bpm / 1.3 : isLowEnd ? 60000 / track.bpm / 1.5 : 60000 / track.bpm / 2
+  // MISMO TICK QUE WEB — igual Ritmo, mismo sonido
+  const tick = 60000 / track.bpm / 2
+  const tickSec = tick / 1000
   let step = 0
+  let bassStep = 0
 
-  // Bajo continuo 8-bit — simplificado en móvil
+  // Bajo continuo — con filtro en TODOS los dispositivos
   bassOsc = ctx.createOscillator()
   const bassGain = ctx.createGain()
   bassOsc.type = 'square'
-  bassGain.gain.value = isAndroidLow ? 0.07 : isLowEnd ? 0.09 : 0.13
-  if (isLowEnd || isAndroidLow) {
-    bassOsc.connect(bassGain); bassGain.connect(gainNode)
-  } else {
-    const bassFilter = ctx.createBiquadFilter()
-    bassFilter.type = 'lowpass'
-    bassFilter.frequency.value = 650
-    bassOsc.connect(bassGain); bassGain.connect(bassFilter); bassFilter.connect(gainNode)
-    currentOscs.push(bassFilter)
-  }
+  bassGain.gain.value = isAndroidLow ? 0.08 : 0.12
+  const bassFilter = ctx.createBiquadFilter()
+  bassFilter.type = 'lowpass'
+  bassFilter.frequency.value = 650
+  bassOsc.connect(bassGain); bassGain.connect(bassFilter); bassFilter.connect(gainNode)
+  currentOscs.push(bassFilter)
   bassOsc.start()
   currentOscs.push(bassOsc, bassGain)
 
-  let bassStep = 0
-  // Drift-corrected scheduler — reemplaza setInterval que se throttlea en móvil
-  // Usa performance.now() para medir tiempo real y catch-up si el browser retrasa
+  // ===== WEB AUDIO LOOK-AHEAD SCHEDULER =====
+  // Programa notas en el timeline de AudioContext.
+  // Si JS se pausa (throttle), las notas ya están programadas en el audio timeline.
+  let nextNoteTime = ctx.currentTime + 0.05
+  const LOOK_AHEAD = isMobile ? 0.1 : 0.15
+  const SCHEDULE_INTERVAL = isMobile ? 75 : 50
   let _stopFlag = false
-  const _origStop = stopCurrent
-  const wrappedStop = () => { _stopFlag = true; _origStop() }
-  // patch temporal: reemplazamos stopCurrent con version que mata el loop
-  const realStopCurrent = stopCurrent
+
   stopCurrent = () => {
     _stopFlag = true
     clearTimeout(autoTimeout)
     clearTimeout(fadeTimeout)
+    if (intervalId) { clearInterval(intervalId); intervalId = null }
     for (const o of currentOscs) try { o.stop(); o.disconnect() } catch {}
     currentOscs = []
-    if (intervalId) { clearTimeout(intervalId); intervalId = null }
     if (bassOsc) try { bassOsc.stop(); bassOsc.disconnect() } catch {}
     bassOsc = null
   }
-  let lastTime = performance.now()
-  let accumulator = 0
-  function schedulerLoop() {
-    if (_stopFlag) return
-    const now = performance.now()
-    let elapsed = now - lastTime
-    lastTime = now
-    // Si elapsed es absurdo (>500ms) el browser estuvo throttled — catch-up rápido
-    if (elapsed > 500) elapsed = tick * 0.1
-    accumulator += elapsed
-    // Catch-up: si hay mucho acumulado, tocar varios steps de golpe (max 4)
-    let stepsToPlay = 0
-    while (accumulator >= tick && stepsToPlay < 4) {
-      accumulator -= tick
-      stepsToPlay++
-    }
-    for (let i = 0; i < stepsToPlay; i++) {
-      playStep(track, step, bassStep, ctx, tick, isMobile, isLowEnd, isAndroidLow)
-      if (!isAndroidLow && step % 2 === 0) {
-        const bSemi = track.bass[bassStep % track.bass.length]
-        const bFreq = (track.base * 0.5) * Math.pow(2, bSemi/12)
-        bassOsc.frequency.linearRampToValueAtTime(bFreq, ctx.currentTime + 0.04)
-        bassStep++
-      }
-      step++
-    }
-    if (stepsToPlay > 0) accumulator = 0 // limpiar para no acumular
-    intervalId = setTimeout(schedulerLoop, Math.max(10, tick * 0.8))
-  }
-  function playStep(track, step, bassStep, ctx, tick, isMobile, isLowEnd, isAndroidLow) {
+
+  function scheduleNote(audioTime) {
     const semi = track.melody[step % track.melody.length]
-    const freq = track.base * Math.pow(2, semi/12)
+    const freq = track.base * Math.pow(2, semi / 12)
     const osc = ctx.createOscillator()
     const gain = ctx.createGain()
     osc.type = 'square'
     osc.frequency.value = freq
-    const vel = isLowEnd ? 0.28 : 0.34 + (step % 4 === 0 ? 0.06 : 0) + (Math.random()*0.04)
-    gain.gain.setValueAtTime(0, ctx.currentTime)
-    gain.gain.linearRampToValueAtTime(vel, ctx.currentTime + 0.008)
-    gain.gain.exponentialRampToValueAtTime(0.02, ctx.currentTime + tick/1000 * 0.85)
-    if (isLowEnd) {
-      osc.connect(gain); gain.connect(gainNode)
-    } else {
-      const filt = ctx.createBiquadFilter()
-      filt.type = 'lowpass'
-      filt.frequency.value = track.mood === 'Noche' || track.mood === 'Tristeza' ? 1800 : 2600 + (step%8===0 ? 400 : 0)
-      osc.connect(gain); gain.connect(filt); filt.connect(gainNode)
-      currentOscs.push(filt)
-    }
-    osc.start(); osc.stop(ctx.currentTime + tick/1000)
+    // Volumen uniforme — sin random para evitar ruido
+    const vel = 0.32 + (step % 4 === 0 ? 0.04 : 0)
+    gain.gain.setValueAtTime(0, audioTime)
+    gain.gain.linearRampToValueAtTime(vel, audioTime + 0.008)
+    gain.gain.exponentialRampToValueAtTime(0.02, audioTime + tickSec * 0.85)
+    // SIEMPRE lowpass filter — igual que web
+    const filt = ctx.createBiquadFilter()
+    filt.type = 'lowpass'
+    filt.frequency.value = track.mood === 'Noche' || track.mood === 'Tristeza' ? 1800 : 2600 + (step % 8 === 0 ? 400 : 0)
+    osc.connect(gain); gain.connect(filt); filt.connect(gainNode)
+    currentOscs.push(filt)
+    osc.start(audioTime)
+    osc.stop(audioTime + tickSec + 0.01)
     currentOscs.push(osc, gain)
-    const isMobile2 = typeof window !== 'undefined' && window.innerWidth < 768
-    if (currentOscs.length > (isAndroidLow ? 8 : isMobile2 ? 12 : isLowEnd ? 14 : 24)) currentOscs.splice(0,3)
+    // Cleanup gentle — no splicear nodos que aún suenan
+    while (currentOscs.length > 30) {
+      const old = currentOscs.shift()
+      try { old.disconnect() } catch {}
+    }
 
-    if (!isLowEnd && !isAndroidLow) {
-      const isTechno = ['techno','house','trance','hardcore','ambient_techno','electro'].includes(Object.keys(TRACKS).find(k=>TRACKS[k]===track))
-      const isCalm = ['calma','noche','serenidad','paz'].includes(Object.keys(TRACKS).find(k=>TRACKS[k]===track))
-      if (isTechno) {
-        if (step % 2 === 0) {
-          const kOsc = ctx.createOscillator(); const kGain = ctx.createGain()
-          kOsc.type='sine'; kOsc.frequency.setValueAtTime(55, ctx.currentTime); kOsc.frequency.exponentialRampToValueAtTime(30, ctx.currentTime+0.12)
-          kGain.gain.setValueAtTime(0, ctx.currentTime); kGain.gain.linearRampToValueAtTime(0.18, ctx.currentTime+0.005); kGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime+0.14)
-          kOsc.connect(kGain); kGain.connect(gainNode); kOsc.start(ctx.currentTime); kOsc.stop(ctx.currentTime+0.14)
-          currentOscs.push(kOsc, kGain)
-        }
+    // Ritmo adicional — solo desktop
+    if (!isMobile && !isLowEnd) {
+      const trackKey = Object.keys(TRACKS).find(k => TRACKS[k] === track)
+      const isTechno = ['techno', 'house', 'trance', 'hardcore', 'ambient_techno', 'electro'].includes(trackKey)
+      const isCalm = ['calma', 'noche', 'serenidad', 'paz'].includes(trackKey)
+      if (isTechno && step % 2 === 0) {
+        const kOsc = ctx.createOscillator(); const kGain = ctx.createGain()
+        kOsc.type = 'sine'; kOsc.frequency.setValueAtTime(55, audioTime); kOsc.frequency.exponentialRampToValueAtTime(30, audioTime + 0.12)
+        kGain.gain.setValueAtTime(0, audioTime); kGain.gain.linearRampToValueAtTime(0.18, audioTime + 0.005); kGain.gain.exponentialRampToValueAtTime(0.01, audioTime + 0.14)
+        kOsc.connect(kGain); kGain.connect(gainNode); kOsc.start(audioTime); kOsc.stop(audioTime + 0.14)
+        currentOscs.push(kOsc, kGain)
         const hGain = ctx.createGain(); const hFilt = ctx.createBiquadFilter()
-        hFilt.type='highpass'; hFilt.frequency.value=7500
-        hGain.gain.setValueAtTime(0, ctx.currentTime); hGain.gain.linearRampToValueAtTime(0.08, ctx.currentTime+0.002); hGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.05)
-        const hOsc = ctx.createOscillator(); hOsc.type='square'; hOsc.frequency.value=2200+Math.random()*400
-        hOsc.connect(hGain); hGain.connect(hFilt); hFilt.connect(gainNode); hOsc.start(ctx.currentTime); hOsc.stop(ctx.currentTime+0.05)
+        hFilt.type = 'highpass'; hFilt.frequency.value = 7500
+        hGain.gain.setValueAtTime(0, audioTime); hGain.gain.linearRampToValueAtTime(0.08, audioTime + 0.002); hGain.gain.exponentialRampToValueAtTime(0.001, audioTime + 0.05)
+        const hOsc = ctx.createOscillator(); hOsc.type = 'square'; hOsc.frequency.value = 2200 + Math.random() * 400
+        hOsc.connect(hGain); hGain.connect(hFilt); hFilt.connect(gainNode); hOsc.start(audioTime); hOsc.stop(audioTime + 0.05)
         currentOscs.push(hOsc, hGain, hFilt)
       } else if (!isCalm && step % 2 === 1) {
         const hGain = ctx.createGain(); const hFilt = ctx.createBiquadFilter()
-        hFilt.type='highpass'; hFilt.frequency.value=7000
-        hGain.gain.setValueAtTime(0, ctx.currentTime); hGain.gain.linearRampToValueAtTime(0.05, ctx.currentTime+0.003); hGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.05)
-        const hOsc = ctx.createOscillator(); hOsc.type='square'; hOsc.frequency.value=1800+Math.random()*400
-        hOsc.connect(hGain); hGain.connect(hFilt); hFilt.connect(gainNode); hOsc.start(ctx.currentTime); hOsc.stop(ctx.currentTime+0.05)
+        hFilt.type = 'highpass'; hFilt.frequency.value = 7000
+        hGain.gain.setValueAtTime(0, audioTime); hGain.gain.linearRampToValueAtTime(0.05, audioTime + 0.003); hGain.gain.exponentialRampToValueAtTime(0.001, audioTime + 0.05)
+        const hOsc = ctx.createOscillator(); hOsc.type = 'square'; hOsc.frequency.value = 1800 + Math.random() * 400
+        hOsc.connect(hGain); hGain.connect(hFilt); hFilt.connect(gainNode); hOsc.start(audioTime); hOsc.stop(audioTime + 0.05)
         currentOscs.push(hOsc, hGain, hFilt)
       }
     }
+
+    // Bajo cambia cada 2 pasos
+    if (step % 2 === 0) {
+      const bSemi = track.bass[bassStep % track.bass.length]
+      const bFreq = (track.base * 0.5) * Math.pow(2, bSemi / 12)
+      bassOsc.frequency.setValueAtTime(bFreq, audioTime)
+      bassStep++
+    }
+    step++
   }
-  schedulerLoop()
+
+  function scheduler() {
+    if (_stopFlag) return
+    while (nextNoteTime < ctx.currentTime + LOOK_AHEAD) {
+      scheduleNote(nextNoteTime)
+      nextNoteTime += tickSec
+    }
+  }
+  intervalId = setInterval(scheduler, SCHEDULE_INTERVAL)
 }
 
 export function createMusicManager() {

@@ -136,7 +136,13 @@ const visibleRange = computed(() => {
 
 const visibleRows = computed(() => {
   const { startX, endX, startY, endY } = visibleRange.value
-  return city.grid.slice(startY, endY).map(row => row.slice(startX, endX))
+  const rows = city.grid.slice(startY, endY).map(row => row.slice(startX, endX))
+  // fallback móvil: si por cámara queda vacío, muestra centro 10x10
+  if (!rows.length || !rows[0]?.length) {
+    const mid = Math.floor(city.grid.length/2)
+    return city.grid.slice(mid-5, mid+5).map(r => r.slice(mid-5, mid+5))
+  }
+  return rows
 })
 
 function onKeydown(e) {
