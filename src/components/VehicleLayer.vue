@@ -39,18 +39,84 @@ function startTick() {
   if (timer) clearInterval(timer)
   const ms = perf.preset.value.trafficTickMs ?? 500
   timer = setInterval(() => {
+    if (document.visibilityState === 'hidden') return
     traffic.tick()
-    try {
-      const v = traffic.vehicles[0]
-      if (v) {
-        audio.ambient.update(city.grid, { x: v.x, y: v.y })
-      }
-    } catch {}
+    // ambient solo en high/medium y throttleado (cada 2 ticks en low ahorra CPU)
+    if (!perf.isLowEnd.value) {
+      try {
+        const v = traffic.vehicles[0]
+        if (v) audio.ambient.update(city.grid, { x: v.x, y: v.y })
+      } catch {}
+    }
   }, ms)
 }
+
+// Camera culling: solo renderizar entidades visibles en pantalla
+const camX = ref(0)
+const camY = ref(0)
+const camScale = ref(1)
+function updateCam() {
+  try {
+    const grid = document.querySelector('[class*="will-change-transform"]')
+    if (grid) {
+      const t = grid.style.transform
+      const m = t.match(/translate\(([-\d.]+)px,\s*([-\d.]+)px\)\s*scale\(([-\d.]+)\)/)
+      if (m) { camX.value = parseFloat(m[1]); camY.value = parseFloat(m[2]); camScale.value = parseFloat(m[3]) }
+    }
+  } catch {}
+}
+let camTimer = null
+onMounted(() => {
+  // low: cam culling cada 500ms en vez de 200 para ahorrar
+  const camMs = perf.isLowEnd.value ? 600 : 200
+  camTimer = setInterval(updateCam, camMs)
+  watch(() => perf.effectiveQuality.value, () => {
+    if (camTimer) clearInterval(camTimer)
+    camTimer = setInterval(updateCam, perf.isLowEnd.value ? 600 : 200)
+  })
+})
+onUnmounted(() => { if (camTimer) clearInterval(camTimer) })
+
+const isSimple = computed(() => perf.preset.value.simpleEntities)
+const maxVisible = computed(() => perf.preset.value.maxVisibleEntities ?? 999)
+
+function isVisible(entity) {
+  if (maxVisible.value >= 999) return true
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const s = camScale.value
+  const ox = city.offsetX ?? 0
+  const oy = city.offsetY ?? 0
+  const ex = ((entity.x - ox) * 48 + 24) * s + camX.value
+  const ey = ((entity.y - oy) * 48 + 24) * s + camY.value
+  return ex > -80 && ex < vw + 80 && ey > -80 && ey < vh + 80
+}
+
+const visibleVehicles = computed(() => {
+  const arr = traffic.vehicles
+  if (maxVisible.value >= 999) return arr
+  return arr.filter(v => isVisible(v)).slice(0, maxVisible.value)
+})
+const visiblePeds = computed(() => {
+  const arr = traffic.pedestrians
+  if (maxVisible.value >= 999) return arr
+  return arr.filter(p => isVisible(p)).slice(0, maxVisible.value)
+})
+// también cull boats/trains/accidents en low (no renderizar fuera de vista)
+const visibleBoats = computed(() => {
+  if (maxVisible.value >= 999) return traffic.boats
+  return traffic.boats.filter(b => isVisible(b)).slice(0, 8)
+})
+const visibleTrains = computed(() => {
+  if (maxVisible.value >= 999) return traffic.trains
+  return traffic.trains.filter(t => isVisible(t)).slice(0, 4)
+})
 onMounted(() => {
   startTick()
   watch(() => perf.effectiveQuality.value, startTick)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') startTick()
+  })
 })
 onUnmounted(() => clearInterval(timer))
 
@@ -78,29 +144,39 @@ const pedBodies = {
 <template>
   <div class="absolute inset-0 pointer-events-none">
     <div
-      v-for="v in traffic.vehicles"
+      v-for="v in visibleVehicles"
       :key="'v'+v.id"
       class="absolute w-[24px] h-[24px] -translate-x-1/2 -translate-y-1/2 flex items-center justify-center text-[16px] select-none"
-      :style="{ left: posFor(v).x + 'px', top: posFor(v).y + 'px', transform: `translate(-50%,-50%) rotate(${rotMap[v.dir]||0}deg)`, transition: `left ${v.speed}ms linear, top ${v.speed}ms linear, transform 180ms` }"
+      :style="{ left: posFor(v).x + 'px', top: posFor(v).y + 'px', transform: `translate(-50%,-50%) rotate(${rotMap[v.dir]||0}deg)`, transition: isSimple ? 'none' : `left ${v.speed}ms linear, top ${v.speed}ms linear, transform 180ms` }"
       :title="v.type + (v.owner ? ' ['+v.owner+']' : '') + (v.hp ? ' HP:'+v.hp : '')"
-      :class="{ 'animate-pulse': v.type==='police_car' || v.type==='ambulance', 'ring-2 ring-white rounded-full': selection.isSelected('veh', v.id), 'ring-2 ring-yellow-400': single.isActive && v.owner && v.owner !== single.humanPlayer()?.id }"
+      :class="{ 'ring-2 ring-white rounded-full': selection.isSelected('veh', v.id), 'ring-2 ring-yellow-400': single.isActive && v.owner && v.owner !== single.humanPlayer()?.id }"
     >
-      <span :class="{ 'drop-shadow-[0_0_4px_rgba(59,130,246,0.8)]': v.type==='police_car', 'drop-shadow-[0_0_4px_rgba(239,68,68,0.8)]': v.type==='ambulance' }">{{ vehicleIcons[v.type] || '🚗' }}</span>
+      <span>{{ vehicleIcons[v.type] || '🚗' }}</span>
       <div v-if="v.hp!==undefined && v.hp<100" class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-[16px] h-1 bg-black/40 rounded-full overflow-hidden border border-white/20"><div class="h-full bg-red-500" :style="{width: v.hp+'%'}"></div></div>
     </div>
     <div
-      v-for="b in traffic.boats"
+      v-for="b in visibleBoats"
       :key="'b'+b.id"
       class="absolute w-[26px] h-[26px] -translate-x-1/2 -translate-y-1/2 flex items-center justify-center text-[18px] select-none"
-      :style="{ left: posFor(b).x + 'px', top: posFor(b).y + 'px', transform: `translate(-50%,-50%) rotate(${rotMap[b.dir]||0}deg)`, transition: `left ${b.speed}ms linear, top ${b.speed}ms linear, transform 180ms` }"
+      :style="{ left: posFor(b).x + 'px', top: posFor(b).y + 'px', transform: `translate(-50%,-50%) rotate(${rotMap[b.dir]||0}deg)`, transition: isSimple ? 'none' : `left ${b.speed}ms linear, top ${b.speed}ms linear, transform 180ms` }"
       :title="b.type + (b.cargo?.length ? ' cargo:'+b.cargo.length : '')"
     >
-      <span class="drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]">{{ vehicleIcons[b.type] || '⛵' }}</span>
+      <span :class="isSimple ? '' : 'drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]'">{{ vehicleIcons[b.type] || '⛵' }}</span>
       <div v-if="b.cargo && b.cargo.length" class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 border border-white text-[8px] font-black flex items-center justify-center">{{ b.cargo.length }}</div>
     </div>
-    <!-- Peatones con cuerpo, pies y manos, caminando lento -->
+    <!-- Peatones: modo simple = emoji, modo completo = cuerpo detallado -->
+    <template v-if="isSimple">
+      <div
+        v-for="p in visiblePeds"
+        :key="'p'+p.id"
+        class="absolute w-[14px] h-[14px] -translate-x-1/2 -translate-y-1/2 flex items-center justify-center text-[10px] select-none"
+        :style="{ left: posFor(p).x + 'px', top: (posFor(p).y+6) + 'px' }"
+        :class="{ 'ring-1 ring-red-500 rounded-full': p.kind==='criminal' }"
+      >{{ p.kind==='criminal' ? '🔪' : p.kind==='police' ? '👮' : p.kind==='medic' ? '🧑‍⚕️' : p.kind==='fireman' ? '🧑‍🚒' : '🧑' }}</div>
+    </template>
+    <template v-else>
     <div
-      v-for="p in traffic.pedestrians"
+      v-for="p in visiblePeds"
       :key="'p'+p.id"
       class="absolute w-[16px] h-[18px] -translate-x-1/2 -translate-y-1/2 select-none"
       :style="{ left: posFor(p).x + 'px', top: (posFor(p).y+6) + 'px', transition: `left ${p.speed}ms linear, top ${p.speed}ms linear` }"
@@ -142,15 +218,16 @@ const pedBodies = {
         <div v-else-if="p.kind==='judge'" class="absolute -bottom-2 left-1/2 -translate-x-1/2 text-[6px] bg-black text-white px-1 rounded-full font-bold border border-white/20">JUEZ</div>
       </div>
     </div>
+    </template>
     <!-- Accidentes — cruz roja sobre carretera -->
     <div v-for="a in traffic.accidents" :key="'a'+a.id" class="absolute w-[28px] h-[28px] -translate-x-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none" :style="{ left: posFor(a).x+'px', top: posFor(a).y+'px' }">
       <div class="w-6 h-6 rounded-full bg-red-600/90 border-2 border-white flex items-center justify-center text-[12px] animate-pulse shadow-[0_2px_8px_rgba(220,38,38,0.6)]">⚠️</div>
     </div>
     <div
-      v-for="t in traffic.trains"
+      v-for="t in visibleTrains"
       :key="'t'+t.id"
       class="absolute w-[28px] h-[18px] -translate-x-1/2 -translate-y-1/2 flex items-center justify-center text-[18px] select-none"
-      :style="{ left: posFor(t).x + 'px', top: posFor(t).y + 'px', transform: `translate(-50%,-50%) rotate(${rotMap[t.dir]||0}deg)`, transition: `left ${t.speed}ms linear, top ${t.speed}ms linear, transform 180ms` }"
+      :style="{ left: posFor(t).x + 'px', top: posFor(t).y + 'px', transform: `translate(-50%,-50%) rotate(${rotMap[t.dir]||0}deg)`, transition: isSimple ? 'none' : `left ${t.speed}ms linear, top ${t.speed}ms linear, transform 180ms` }"
       :title="t.type"
     >
       🚂

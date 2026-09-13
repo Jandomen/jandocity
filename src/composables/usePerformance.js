@@ -11,6 +11,13 @@ const preset = computed(() => PERFORMANCE_PRESETS[effectiveQuality.value] || PER
 
 const isLowEnd = computed(() => effectiveQuality.value === 'low')
 const isMobile = computed(() => typeof navigator !== 'undefined' && (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '') || (typeof window !== 'undefined' && window.innerWidth < 768)))
+// clase CSS global para optimizar estilos en low (desactiva blur/shadows vía CSS)
+if (typeof document !== 'undefined') {
+  watch(effectiveQuality, (q) => {
+    document.documentElement.classList.toggle('perf-low', q === 'low')
+    document.documentElement.classList.toggle('perf-mobile', /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || ''))
+  }, { immediate: true })
+}
 
 function setQuality(q) {
   quality.value = q

@@ -40,6 +40,7 @@ import AtomicFlash from '@/components/AtomicFlash.vue'
 import MiniMap from '@/components/MiniMap.vue'
 import CharacterSelect from '@/components/CharacterSelect.vue'
 import { APP_URL } from '@/config.js'
+import { usePerformance } from '@/composables/usePerformance.js'
 
 const city = useCityStore()
 const player = usePlayerStore()
@@ -77,7 +78,9 @@ supabase.auth.onAuthStateChange((_e,sess)=> isLogged.value=!!sess)
 async function doLogout(){ await supabase.auth.signOut(); isLogged.value=false }
 const chatMessages = ref([])
 const nowTick = ref(Date.now())
-setInterval(() => nowTick.value = Date.now(), 400)
+const _chatInterval = setInterval(() => {
+  if (document.visibilityState !== 'hidden') nowTick.value = Date.now()
+}, 800)
 const recentChats = computed(() => {
   const now = nowTick.value
   // 7s en pantalla, si hay más de 4 se ven 4 con scroll
@@ -358,14 +361,16 @@ function exitToMenu() {
   loadingText.value = 'Cargando...'
 }
 
- // autosave al mundo activo cada 2s + al cambiar
+  // autosave al mundo activo — throttled 2.5s en low para menos IO/CPU
 let worldSaveTimer = null
+const perfAutosave = usePerformance()
 watch(() => [city.money, city.tickCount], () => {
   if (appState.value !== 'playing' || !activeWorldId.value) return
+  const delay = perfAutosave.isLowEnd.value ? 2500 : 800
   clearTimeout(worldSaveTimer)
   worldSaveTimer = setTimeout(() => {
     try { updateWorldData(activeWorldId.value, city.getSaveData()) } catch {}
-  }, 800)
+  }, delay)
 })
 
 onMounted(async () => {

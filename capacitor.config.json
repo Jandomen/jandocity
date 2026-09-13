@@ -2,7 +2,8 @@
   "appId": "com.jandocity.app",
   "appName": "Jandocity",
   "webDir": "dist",
-  "server": { "androidScheme": "https" },
+  "server": { "androidScheme": "https", "cleartext": false },
+  "android": { "allowMixedContent": false, "webContentsDebuggingEnabled": false },
   "plugins": {
     "CapacitorUpdater": {
       "autoUpdate": false,

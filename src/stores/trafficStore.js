@@ -85,6 +85,27 @@ export const useTrafficStore = defineStore('traffic', () => {
     return { ok: true }
   }
 
+  // caché ocupación para no recalcular O(n^2) cada tick en móviles
+  let _occMap = null
+  let _occDirty = true
+  function buildOccMap() {
+    _occMap = new Map()
+    for (const p of pedestrians.value) {
+      const k = `${p.x},${p.y}`
+      _occMap.set(k, (_occMap.get(k)||0)+1)
+    }
+    for (const v of vehicles.value) {
+      const k = `${v.x},${v.y}`
+      _occMap.set(k, (_occMap.get(k)||0)+1)
+    }
+    _occDirty = false
+  }
+  function occupancy(x, y) {
+    if (_occDirty || !_occMap) buildOccMap()
+    return _occMap.get(`${x},${y}`) || 0
+  }
+  function markOccDirty(){ _occDirty = true }
+
   function randomStep(entity, isTrain = false) {
     const city = useCityStore()
     const check = isTrain ? isRailCell : isRoadCell
@@ -95,13 +116,6 @@ export const useTrafficStore = defineStore('traffic', () => {
       { dx: 0, dy: 1, dir: 'down' },
     ]
     const opposite = { right:'left', left:'right', up:'down', down:'up' }
-    // evitar aglomeración: cuenta peatones/vehículos en destino
-    function occupancy(x, y) {
-      let n = 0
-      for (const p of pedestrians.value) if (p.x === x && p.y === y) n++
-      for (const v of vehicles.value) if (!isTrain && v.x === x && v.y === y) n++
-      return n
-    }
     let candidates = []
     for (const d of dirs) {
       if (opposite[entity.dir] === d.dir && Math.random() < 0.7) continue
@@ -200,15 +214,21 @@ export const useTrafficStore = defineStore('traffic', () => {
   }
 
   function tick() {
-    // sirenas ocasionales para patrullas/ambulancias (no saturar)
+    // early out si pestaña oculta (ahorro móvil)
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+    _occDirty = true
+    // sirenas ocasionales — desactivadas en low para ahorrar audio CPU
     try {
-      const hasPolice = vehicles.value.some(v => v.type === 'police_car' || v.type === 'army_jeep')
-      const hasAmb = vehicles.value.some(v => v.type === 'ambulance')
-      if (hasPolice && Math.random() < 0.06) {
-        try { useAudioManager().effects.playSiren('police') } catch {}
-      }
-      if (hasAmb && Math.random() < 0.05) {
-        try { useAudioManager().effects.playSiren('ambulance') } catch {}
+      const isLow = pedestrians.value.length <= 6 && vehicles.value.length <= 4
+      if (!isLow) {
+        const hasPolice = vehicles.value.some(v => v.type === 'police_car' || v.type === 'army_jeep')
+        const hasAmb = vehicles.value.some(v => v.type === 'ambulance')
+        if (hasPolice && Math.random() < 0.03) {
+          try { useAudioManager().effects.playSiren('police') } catch {}
+        }
+        if (hasAmb && Math.random() < 0.02) {
+          try { useAudioManager().effects.playSiren('ambulance') } catch {}
+        }
       }
     } catch {}
     // aviones: interpolación diagonal suave 0->1 en ~6 ticks (3s)
@@ -525,7 +545,10 @@ export const useTrafficStore = defineStore('traffic', () => {
     }
   }
 
-  function clear() { vehicles.value = []; pedestrians.value = []; trains.value = []; boats.value = []; accidents.value = []; airportPlanes.value = [] }
+  function clear() { vehicles.value = []; pedestrians.value = []; trains.value = []; boats.value = []; accidents.value = []; airportPlanes.value = []; _occDirty = true; markOccDirty() }
 
-  return { vehicles, pedestrians, trains, boats, accidents, airportPlanes, addVehicle, addPedestrian, addAccident, addAirportPlane, tick, clear }
+  // exponer para forzar rebuild tras carga
+  function invalidateOcc(){ _occDirty = true }
+
+  return { vehicles, pedestrians, trains, boats, accidents, airportPlanes, addVehicle, addPedestrian, addAccident, addAirportPlane, tick, clear, invalidateOcc }
 })

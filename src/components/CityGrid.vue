@@ -118,26 +118,42 @@ const quadrants = computed(() => {
   return list
 })
 
+const isLow = computed(() => perf.isLowEnd.value)
+// throttled visibleRange — cachea por frame para evitar recalcular en cada render
+let _vrCache = { startX: 0, endX: 20, startY: 0, endY: 20 }
+let _vrDirty = true
+let _vrRaf = 0
+function markVRDirty(){ _vrDirty = true; if(!_vrRaf){ _vrRaf = requestAnimationFrame(()=>{ _vrRaf=0; _vrDirty=true }) } }
+
 const visibleRange = computed(() => {
+  // usa cache si no hay cambio de cámara/escala; isLow fuerza recalculo cada vez
+  const s = camera.scale.value
+  const cx = camera.x.value, cy = camera.y.value
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1920
   const vh = typeof window !== 'undefined' ? window.innerHeight : 1080
-  const s = camera.scale.value
   const overscan = perf.preset.value.visibleOverscan ?? 2
-  const localLeft = (-camera.x.value) / s
-  const localTop = (-camera.y.value) / s
-  const localRight = (vw - camera.x.value) / s
-  const localBottom = (vh - camera.y.value) / s
+  const localLeft = (-cx) / s
+  const localTop = (-cy) / s
+  const localRight = (vw - cx) / s
+  const localBottom = (vh - cy) / s
   const startX = Math.max(0, Math.floor(localLeft / 48) - overscan)
   const endX = Math.min(gridWidth.value, Math.ceil(localRight / 48) + overscan)
   const startY = Math.max(0, Math.floor(localTop / 48) - overscan)
   const endY = Math.min(gridHeight.value, Math.ceil(localBottom / 48) + overscan)
-  return { startX, endX, startY, endY }
+  _vrCache = { startX, endX, startY, endY }
+  return _vrCache
 })
 
 const visibleRows = computed(() => {
   const { startX, endX, startY, endY } = visibleRange.value
-  const rows = city.grid.slice(startY, endY).map(row => row.slice(startX, endX))
-  // fallback móvil: si por cámara queda vacío, muestra centro 10x10
+  // low: clamp más agresivo para menos DOM (máx 15x10 celdas visibles)
+  let sx = startX, ex = endX, sy = startY, ey = endY
+  if (isLow.value) {
+    const maxW = 16, maxH = 12
+    if (ex - sx > maxW) { const cx = (sx+ex)/2; sx = Math.max(0, Math.floor(cx - maxW/2)); ex = Math.min(gridWidth.value, sx+maxW) }
+    if (ey - sy > maxH) { const cy = (sy+ey)/2; sy = Math.max(0, Math.floor(cy - maxH/2)); ey = Math.min(gridHeight.value, sy+maxH) }
+  }
+  const rows = city.grid.slice(sy, ey).map(row => row.slice(sx, ex))
   if (!rows.length || !rows[0]?.length) {
     const mid = Math.floor(city.grid.length/2)
     return city.grid.slice(mid-5, mid+5).map(r => r.slice(mid-5, mid+5))
@@ -187,17 +203,27 @@ function startTicks() {
   if (selTick) clearInterval(selTick)
   const bMs = perf.preset.value.buildTickMs ?? 100
   const sMs = perf.preset.value.selectionTickMs ?? 420
-  buildTick = setInterval(() => { if (single.isActive || isMulti.value) { buildQueue.tick(bMs); unitQueue.tick(bMs) } }, bMs)
-  selTick = setInterval(() => { if (single.isActive || isMulti.value) selection.tick() }, sMs)
+  buildTick = setInterval(() => {
+    if (document.visibilityState === 'hidden') return
+    if (single.isActive || isMulti.value) { buildQueue.tick(bMs); unitQueue.tick(bMs) }
+  }, bMs)
+  selTick = setInterval(() => {
+    if (document.visibilityState === 'hidden') return
+    if (single.isActive || isMulti.value) selection.tick()
+  }, sMs)
 }
+// pausa ticks cuando pestaña oculta (ahorro batería móvil)
+let visHandler = null
 onMounted(() => {
-  window.addEventListener('keydown', onKeydown)
+  window.addEventListener('keydown', onKeydown, { passive: false })
   startTicks()
-  // re-evaluar al cambiar calidad
   watch(() => perf.effectiveQuality.value, startTicks)
+  visHandler = () => { if (document.visibilityState === 'visible') startTicks() }
+  document.addEventListener('visibilitychange', visHandler)
 })
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown)
+  if (visHandler) document.removeEventListener('visibilitychange', visHandler)
   if (buildTick) clearInterval(buildTick)
   if (selTick) clearInterval(selTick)
 })
@@ -242,9 +268,22 @@ function getValidation(cell) {
     if (cell.terrain === t) return { ok: false, reason: 'Ya es ' + t }
     const cost = { lake: 15, deep_lake: 20, sand_brush: 8, forest_brush: 12, grass_brush: 10, concrete_brush: 10, tile_brush: 12, wood_brush: 12, marble_brush: 14, stone_brush: 10 }[city.selectedTool] || 0
     if (city.money < cost) return { ok: false, reason: `Fondos insuficientes (${cost}💰)` }
-    if ((t === 'water' || t === 'deep_water') && hasAnyWater.value && !isAdjacentToWater(city.grid, cell.x, cell.y, 1, 1)) {
+    // low: omite check adyacencia agua (costoso O(n) perímetro) para ahorrar CPU
+    if (!isLow.value && (t === 'water' || t === 'deep_water') && hasAnyWater.value && !isAdjacentToWater(city.grid, cell.x, cell.y, 1, 1)) {
       return { ok: false, reason: 'Estanque requiere río/lago cerca — pinta pegado al agua 🌊' }
     }
+    return { ok: true, reason: null }
+  }
+  // low: validación ligera sin isAdjacentToRoad/Water completo (evita canPlaceAt pesado en hover)
+  if (isLow.value) {
+    if (cell.buildingId || cell.occupiedBy) return { ok: false, reason: 'Casilla ocupada' }
+    const t = cell.terrain || cell.terrainType
+    if ((t === 'water' || t === 'deep_water') && !['road','dirt_road','concrete_road','cobble_road','rail'].includes(city.selectedTool)) {
+      return { ok: false, reason: 'No se puede construir sobre agua' }
+    }
+    const tool = city.selectedTool
+    // solo chequeo rápido de fondos
+    try { const bt = BUILDINGS[tool]; if (bt && city.money < bt.cost) return { ok:false, reason:'Fondos insuficientes' } } catch {}
     return { ok: true, reason: null }
   }
   return canPlaceAt(city.grid, cell.x, cell.y, city.selectedTool, city.money)
@@ -434,11 +473,13 @@ async function handleCellEnter(cell) {
     <div class="absolute inset-0 pointer-events-none" style="background: radial-gradient(1px 1px at 20% 30%, #fff 100%, transparent 100%), radial-gradient(1px 1px at 40% 70%, #fff 100%, transparent 100%), radial-gradient(1px 1px at 80% 20%, #fff 100%, transparent 100%), radial-gradient(1.2px 1.2px at 60% 50%, #fff 100%, transparent 100%), radial-gradient(1px 1px at 10% 80%, #fff 100%, transparent 100%), radial-gradient(0.8px 0.8px at 90% 90%, #fff 100%, transparent 100%); background-size: 280px 280px; opacity: 0.45;"></div>
     <!-- Contenedor con dimensiones fijas 48×GRID — crece hacia afuera, matriz 150×150 -->
     <div
-      class="absolute top-0 left-0 will-change-transform bg-[#0a0f1e] m-0 p-0 border-0 shadow-none"
+      class="absolute top-0 left-0 bg-[#0a0f1e] m-0 p-0 border-0 shadow-none"
+      :class="isLow ? '' : 'will-change-transform'"
       :style="{ 
         transform: camera.transform.value,
         width: `${gridWidth * 48}px`,
-        height: `${gridHeight * 48}px`
+        height: `${gridHeight * 48}px`,
+        contain: isLow ? 'layout paint' : 'none',
       }"
       @mouseenter="isHoveringGrid = true"
       @mouseleave="isHoveringGrid = false"

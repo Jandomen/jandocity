@@ -21,8 +21,14 @@ export function useGameLoop(tickCallback, options = {}) {
     isRunning.value = true
     isPaused.value = false
     intervalId = setInterval(() => {
+      if (document.visibilityState === 'hidden') return
       if (!isPaused.value) tickCallback()
     }, interval)
+    // pausa automática en background (ahorro batería Android gama baja)
+    const vis = () => { if (document.visibilityState === 'hidden') isPaused.value = true; else if (isRunning.value) isPaused.value = false }
+    document.addEventListener('visibilitychange', vis)
+    // cleanup se hace en stop
+    intervalId._vis = vis
   }
 
   function pause() {
@@ -38,7 +44,10 @@ export function useGameLoop(tickCallback, options = {}) {
   }
 
   function stop() {
-    if (intervalId) clearInterval(intervalId)
+    if (intervalId) {
+      if (intervalId._vis) document.removeEventListener('visibilitychange', intervalId._vis)
+      clearInterval(intervalId)
+    }
     intervalId = null
     isRunning.value = false
   }

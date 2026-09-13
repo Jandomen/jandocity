@@ -10,8 +10,9 @@ export function useCamera() {
   const y = ref(0)
   const scale = ref(1)
 
-  const MIN_SCALE = 0.6
-  const MAX_SCALE = 2.2
+  const isLow = typeof navigator !== 'undefined' && (/Android/i.test(navigator.userAgent||'') && ((navigator.deviceMemory||4) <=3))
+  const MIN_SCALE = isLow ? 0.7 : 0.6
+  const MAX_SCALE = isLow ? 1.6 : 2.2
 
   let isDragging = false
   let lastX = 0
@@ -19,7 +20,7 @@ export function useCamera() {
   let startX = 0
   let startY = 0
 
-  const transform = computed(() => `translate(${x.value}px, ${y.value}px) scale(${scale.value})`)
+  const transform = computed(() => `translate3d(${x.value}px, ${y.value}px, 0) scale(${scale.value})`)
 
   // Callback externo para que CityGrid sepa si hay pan activo
   let _onPanStart = null

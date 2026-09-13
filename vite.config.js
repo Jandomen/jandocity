@@ -25,8 +25,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        maximumFileSizeToCacheInBytes: 3000000,
         runtimeCaching: [
-          { urlPattern: /^https:\/\/.*/, handler: 'NetworkFirst', options: { cacheName: 'external' } }
+          { urlPattern: /^https:\/\/.*/, handler: 'NetworkFirst', options: { cacheName: 'external', expiration: { maxEntries: 30, maxAgeSeconds: 86400 } } }
         ]
       }
     })
@@ -36,5 +37,23 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src')
     }
   },
-  server: { port: 5173 }
+  server: { port: 5173 },
+  build: {
+    target: 'es2018',
+    cssCodeSplit: true,
+    sourcemap: false,
+    minify: 'esbuild',
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['vue', 'pinia'],
+          supabase: ['@supabase/supabase-js'],
+        },
+      },
+    },
+  },
+  optimizeDeps: {
+    include: ['vue', 'pinia', '@supabase/supabase-js', 'simplex-noise'],
+  },
 })

@@ -44,12 +44,12 @@ function waterBorderClass(grid, x, y) {
   return cls
 }
 
-// Textura procedural — optimizada para 150×150: para >10k celdas usa paso ligero
+// Textura procedural — optimizada para 150×150: gama baja usa canvas plano sin ruido
 function drawTexture() {
   const canvas = canvasRef.value
   if (!canvas) return
   if (props.unified) {
-    const dpr = window.devicePixelRatio || 1
+    const dpr = Math.min(window.devicePixelRatio || 1, perf.isLowEnd.value ? 1 : 2)
     const rect = canvas.getBoundingClientRect()
     canvas.width = rect.width * dpr
     canvas.height = rect.height * dpr
@@ -57,12 +57,23 @@ function drawTexture() {
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     return
   }
-  const dpr = window.devicePixelRatio || 1
+  // Low: no canvas texture — deja fondo sólido CSS (0 CPU/GPU)
+  if (perf.isLowEnd.value) {
+    const dpr = 1
+    const rect = canvas.getBoundingClientRect()
+    if (rect.width === 0 || rect.height === 0) return
+    canvas.width = Math.min(rect.width, 1024)
+    canvas.height = Math.min(rect.height, 1024)
+    const ctx = canvas.getContext('2d')
+    ctx.fillStyle = '#6bbf45'
+    ctx.fillRect(0,0, canvas.width, canvas.height)
+    return
+  }
+  const dpr = Math.min(window.devicePixelRatio || 1, 2)
   const rect = canvas.getBoundingClientRect()
   const w = rect.width * dpr
   const h = rect.height * dpr
   if (w === 0 || h === 0) return
-  // Para 150×150 (7200px) el canvas sería 10k+ con dpr, limitamos
   const MAX = 4096
   const cw = Math.min(w, MAX), ch = Math.min(h, MAX)
   canvas.width = cw
@@ -71,11 +82,10 @@ function drawTexture() {
   ctx.clearRect(0, 0, cw, ch)
   ctx.fillStyle = '#6bbf45'
   ctx.fillRect(0, 0, cw, ch)
-  // Modo ahorro o grid grande → textura ultra ligera
   const cells = props.grid.length * (props.grid[0]?.length || 0)
   if (!perf.preset.value.terrainNoise || cells > 10000) {
     ctx.fillStyle = 'rgba(143,212,96,0.08)'
-    const count = perf.isLowEnd.value ? 220 : 600
+    const count = 400
     for (let i = 0; i < count; i++) {
       const x = (i * 137) % cw, y = (i * 241) % ch
       ctx.fillRect(x, y, 2, 2)
@@ -111,12 +121,16 @@ function drawTexture() {
 
 let drawTimer = null
 onMounted(() => {
+  // low: no noise → dibujo instantáneo sin debounce pesado
   drawTexture()
-  window.addEventListener('resize', () => { clearTimeout(drawTimer); drawTimer = setTimeout(drawTexture, 120) })
+  if (!perf.isLowEnd.value) {
+    window.addEventListener('resize', () => { clearTimeout(drawTimer); drawTimer = setTimeout(drawTexture, 200) }, { passive: true })
+  }
 })
 
 watch(() => props.grid.length + (props.grid[0]?.length||0), () => {
-  clearTimeout(drawTimer); drawTimer = setTimeout(drawTexture, 120)
+  if (perf.isLowEnd.value) return
+  clearTimeout(drawTimer); drawTimer = setTimeout(drawTexture, 200)
 })
 </script>
 
@@ -162,8 +176,8 @@ watch(() => props.grid.length + (props.grid[0]?.length||0), () => {
             <div v-if="cell.terrain === 'water' || cell.terrain === 'deep_water'" class="absolute inset-0 opacity-30" style="background: radial-gradient(ellipse at 35% 25%, rgba(255,255,255,0.35) 0%, transparent 45%);"></div>
           </div>
 
-          <!-- Decoración — en modo unificado, casillas vacías jugables son pasto plano limpio sin basura -->
-          <template v-if="!unified || cell.buildingId">
+          <!-- Decoración — desactivada en low para ahorrar DOM/GPU -->
+          <template v-if="!perf.isLowEnd.value && (!unified || cell.buildingId)">
             <div v-if="cell.terrain !== 'water' && cell.hasTree" class="absolute w-7 h-7 pointer-events-none select-none" :style="decorStyle(cell)" style="transform: translate(-50%, -62%); filter: drop-shadow(0 4px 5px rgba(0,0,0,0.5));">
               <div class="w-[7px] h-[9px] bg-[#4a2f0f] mx-auto rounded-sm shadow-sm" style="background: linear-gradient(90deg, #3a240c, #5a3a1a);"></div>
               <div class="w-7 h-7 -mt-1 rounded-full" style="background: radial-gradient(circle at 28% 28%, #5faa32, #2d5a1a 65%, #1e3d0f 100%); box-shadow: inset 0 1px 2px rgba(255,255,255,0.25);"></div>

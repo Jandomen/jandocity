@@ -17,3 +17,39 @@ html, body, #app {
   grid-template-columns: repeat(10, minmax(0, 1fr));
   gap: 4px;
 }
+
+/* === OPTIMIZACIÓN GAMA BAJA: desactiva efectos costosos === */
+.perf-low * {
+  /* reduce blur/shadow costosos sin romper layout */
+}
+.perf-low .backdrop-blur,
+.perf-low .backdrop-blur-sm,
+.perf-low .backdrop-blur-md {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.perf-low [class*="shadow-[0_"] {
+  box-shadow: none !important;
+}
+.perf-low .animate-pulse,
+.perf-low .animate-bounce,
+.perf-low .animate-spin {
+  animation: none !important;
+}
+.perf-low .ped-walk,
+.perf-low .ped-leg-l,
+.perf-low .ped-leg-r,
+.perf-low .ped-arm-l,
+.perf-low .ped-arm-r {
+  animation: none !important;
+}
+/* contain para capas del grid en low */
+.perf-low [class*="will-change-transform"] {
+  will-change: auto !important;
+}
+@media (max-width: 768px) {
+  /* móvil: reduce motion global */
+  .perf-low * {
+    scroll-behavior: auto !important;
+  }
+}

@@ -2,6 +2,8 @@
 import { computed } from 'vue'
 import { BUILDINGS } from '@/constants/buildings.js'
 import BuildingSprites from './BuildingSprites.vue'
+import { usePerformance } from '@/composables/usePerformance.js'
+const perf = usePerformance()
 
 const props = defineProps({
   grid: { type: Array, required: true },
@@ -15,7 +17,10 @@ const hdTypes = new Set(['residential','residential_small','residential_medium',
 const buildingVisuals = {}
 
 function isVegetation(id) { return ['bush','flower','rock'].includes(id) }
-function isHD(id) { return hdTypes.has(id) }
+function isHD(id) {
+  if (perf.isLowEnd.value) return false
+  return hdTypes.has(id)
+}
 </script>
 
 <template>
@@ -54,6 +59,11 @@ function isHD(id) { return hdTypes.has(id) }
                 <div class="w-3 h-3 rounded-full bg-pink-400 border border-pink-600"></div><div class="w-3 h-3 rounded-full bg-yellow-400 border border-yellow-600"></div><div class="w-2.5 h-2.5 rounded-full bg-white border border-gray-300"></div>
               </div>
               <div v-else-if="cell.buildingId==='rock'" class="w-6 h-4 rounded-full" style="background: radial-gradient(ellipse at 30% 30%, #a8a29e, #57534e);"></div>
+            </template>
+            <template v-else-if="perf.isLowEnd.value">
+              <div class="relative w-full h-full rounded flex flex-col overflow-hidden items-center justify-center border border-black/10" :style="{ background: BUILDINGS[cell.buildingId]?.color?.replace('bg-','') ? '#6bbf45' : '#22c55e' }">
+                <span class="text-[13px] leading-none">{{ BUILDINGS[cell.buildingId]?.icon || '🏢' }}</span>
+              </div>
             </template>
             <template v-else>
               <div class="relative w-full h-full rounded flex flex-col overflow-hidden items-center justify-center" :style="{ background: buildingVisuals[cell.buildingId]?.bg || '#22c55e' }">
