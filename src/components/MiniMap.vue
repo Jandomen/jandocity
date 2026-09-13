@@ -220,27 +220,21 @@ watch(() => [camera.x.value, camera.y.value, player.x, player.y], draw)
         <span class="animate-pulse">●</span>
         <span>Selecciona en el mapa dónde caerá el ataque. El suelo quedará <b class="text-white">gris con escombros</b> hasta que vuelva el pasto (12s → tierra, 37s → pasto).</span>
       </div>
-      <div class="flex-1 min-h-0 overflow-hidden p-2 sm:p-3 flex items-center justify-center bg-[#0f172a] gap-2">
-        <canvas ref="canvasRef" @click="handleCanvasClick" @mousemove="handleCanvasMove" @mouseleave="hoverPos=null; draw()" class="w-full h-auto aspect-square border border-white/10 rounded shadow shrink min-w-0" :class="isTargeting ? 'cursor-crosshair ring-2 ring-red-500' : 'cursor-default'" style="image-rendering: pixelated; max-width: min(72vw, 340px); max-height: min(54vh, 340px);"></canvas>
-        <!-- Y vertical al lado del canvas — X/Y lateral, ocupa toda la altura disponible sin tapar mapa -->
-        <div v-if="!isTargeting" class="flex flex-col items-center gap-1 bg-black/40 border border-white/10 rounded-full p-1.5 shrink-0 self-center">
-          <span class="text-[7px] text-white/40 font-black">↑ N</span>
-          <input type="range" orient="vertical" min="0" max="100" :value="sliderY" @input="onSliderY" class="w-6 h-[120px] sm:h-[140px] md:h-[220px] accent-white shrink-0" style="writing-mode: bt-lr; -webkit-appearance: slider-vertical;" />
-          <span class="text-[7px] text-white/40 font-black">S ↓</span>
+      <div class="flex-1 overflow-auto p-3 flex items-center justify-center bg-[#0f172a] gap-2">
+        <canvas ref="canvasRef" @click="handleCanvasClick" @mousemove="handleCanvasMove" @mouseleave="hoverPos=null; draw()" class="border border-white/10 rounded shadow shrink-0" :class="isTargeting ? 'cursor-crosshair ring-2 ring-red-500' : 'cursor-default'" style="image-rendering: pixelated; width: min(400px, 82vw, 56vh); height: min(400px, 82vw, 56vh);"></canvas>
+        <!-- Y vertical — pequeño y secundario -->
+        <div v-if="!isTargeting" class="flex flex-col items-center gap-0.5 bg-black/30 border border-white/10 rounded-full p-1 shrink-0">
+          <span class="text-[6px] text-white/30 font-black">↑</span>
+          <input type="range" orient="vertical" min="0" max="100" :value="sliderY" @input="onSliderY" class="w-4 h-[90px] md:h-[140px] accent-white/80" style="writing-mode: bt-lr; -webkit-appearance: slider-vertical;" />
+          <span class="text-[6px] text-white/30 font-black">↓</span>
         </div>
       </div>
-      <!-- X horizontal abajo — solo X, Y ya está al lado -->
-      <div v-if="!isTargeting" class="shrink-0 px-3 py-2 bg-black/30 border-t border-white/10 flex items-center gap-2 md:hidden">
-        <span class="text-[8px] text-white/50 font-black">◀ O</span>
-        <input type="range" min="0" max="100" :value="sliderX" @input="onSliderX" class="flex-1 accent-white h-1" />
-        <span class="text-[8px] text-white/50 font-black">E ▶</span>
-        <button @click="centerOnPlayer" class="ml-2 px-2.5 py-1 rounded-full bg-white/10 border border-white/15 text-white text-[9px] font-bold whitespace-nowrap">⌖</button>
-      </div>
-      <div v-if="!isTargeting" class="hidden md:flex shrink-0 px-3 py-1.5 bg-black/30 border-t border-white/10 items-center gap-2">
-        <span class="text-[8px] text-white/50 font-black">◀ O</span>
-        <input type="range" min="0" max="100" :value="sliderX" @input="onSliderX" class="flex-1 accent-white h-1" />
-        <span class="text-[8px] text-white/50 font-black">E ▶</span>
-        <button @click="centerOnPlayer" class="px-3 py-1 rounded-full bg-white/10 border border-white/15 text-white text-[10px] font-bold whitespace-nowrap">⌖ Centrar</button>
+      <!-- X horizontal — pequeño y secundario -->
+      <div v-if="!isTargeting" class="shrink-0 px-3 py-1.5 bg-black/30 border-t border-white/10 flex items-center gap-2">
+        <span class="text-[7px] text-white/40 font-black">◀</span>
+        <input type="range" min="0" max="100" :value="sliderX" @input="onSliderX" class="flex-1 accent-white/80 h-1 max-w-[200px] mx-auto" />
+        <span class="text-[7px] text-white/40 font-black">▶</span>
+        <button @click="centerOnPlayer" class="px-2 py-1 rounded-full bg-white/10 border border-white/10 text-white text-[9px] font-bold whitespace-nowrap">⌖</button>
       </div>
       <div class="shrink-0 p-3 border-t border-white/10 bg-slate-800/40 flex flex-col gap-2">
         <div v-if="hoverPos && isTargeting" class="text-center text-[11px] font-mono text-white/70">
