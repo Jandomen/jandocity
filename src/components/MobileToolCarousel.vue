@@ -85,7 +85,7 @@ function pick(toolId) {
 </script>
 
 <template>
-  <div class="md:hidden">
+  <div class="">
     <!-- Carrusel inferior — una sola línea, altura del antiguo "Presiona H" -->
     <Transition name="fade">
       <div v-show="showUI" class="absolute bottom-3 left-16 z-20 pointer-events-auto">

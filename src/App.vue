@@ -41,9 +41,14 @@ import MiniMap from '@/components/MiniMap.vue'
 import CharacterSelect from '@/components/CharacterSelect.vue'
 import { APP_URL } from '@/config.js'
 import { usePerformance } from '@/composables/usePerformance.js'
+import { Capacitor } from '@capacitor/core'
 
 const city = useCityStore()
 const player = usePlayerStore()
+const isNative = computed(() => {
+  try { if (Capacitor.isNativePlatform()) return true } catch {}
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '')
+})
 
 useAudioEvents(city)
 const audioMgr = useAudioManager()
@@ -540,15 +545,17 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- Desktop: panel izquierdo -->
+      <!-- Desktop: panel izquierdo — lg (1024px) para que landscape 800px siga siendo móvil -->
       <Transition name="slide-left">
-        <div v-show="showUI" class="hidden md:flex absolute left-3 top-[72px] z-20 w-[300px] max-h-[calc(100vh-84px)] overflow-auto scrollbar-thin flex-col gap-3 pointer-events-auto">
+        <div v-show="showUI" class="hidden lg:flex absolute left-3 top-[72px] z-20 w-[300px] max-h-[calc(100vh-84px)] overflow-auto scrollbar-thin flex-col gap-3 pointer-events-auto" :class="isNative ? '!hidden' : ''">
           <ToolPalette class="shadow-[0_12px_40px_rgba(0,0,0,0.5)] rounded-xl" />
           <AudioControls class="shadow-[0_12px_40px_rgba(0,0,0,0.5)] rounded-xl" />
         </div>
       </Transition>
-      <!-- Móvil: carrusel inferior extendido + modal centrado con X (oculto en pausa/chat) -->
-      <MobileToolCarousel v-if="!isPaused && !showChat" :showUI="showUI" />
+      <!-- Móvil: carrusel inferior — siempre en nativo, en web <1024px -->
+      <div :class="isNative ? '' : 'lg:hidden'">
+        <MobileToolCarousel v-if="!isPaused && !showChat" :showUI="showUI" />
+      </div>
 
       <!-- Chat overlay — T web / 💬 móvil, listo para multijugador -->
       <ChatBox :show="showChat" :messages="chatMessages" @send="sendChat" @close="showChat=false" />
