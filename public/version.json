@@ -1,5 +1,5 @@
 {
-  "version": "0.1.26",
-  "url": "https://adqhqvzkqdhujjipabgf.supabase.co/storage/v1/object/public/updates/jandocity-0.1.26.zip",
-  "notes": "OTA 0.1.26 - cuenta fuera de pausa, salir visible, slider mapa movil"
+  "version": "0.1.27",
+  "url": "https://adqhqvzkqdhujjipabgf.supabase.co/storage/v1/object/public/updates/jandocity-0.1.27.zip",
+  "notes": "OTA 0.1.27 - safe-area fallback 24/48 + insets listener"
 }

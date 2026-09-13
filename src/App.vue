@@ -509,8 +509,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <!-- Ventana normal con barras sistema visibles — safe-area para no quedar debajo -->
-  <div class="relative w-screen h-[100dvh] h-screen overflow-hidden bg-[#0f172a] text-slate-100 font-sans antialiased" style="padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right);">
+  <!-- Ventana normal con barras sistema visibles — safe-area con fallback 24/48px para Android sin env() -->
+  <div class="relative w-screen h-[100dvh] h-screen overflow-hidden bg-[#0f172a] text-slate-100 font-sans antialiased" style="padding-top: env(safe-area-inset-top, 24px); padding-bottom: env(safe-area-inset-bottom, 48px); padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px);">
     <OfflineBanner />
     <!-- Splash 2s -->
     <SplashScreen v-if="appState==='splash'" />
@@ -541,7 +541,7 @@ onUnmounted(() => {
       <div class="absolute top-2 right-2 z-20 md:hidden bg-black/50 backdrop-blur px-2 py-1 rounded-full text-[10px] text-white/70 border border-white/10 pointer-events-none">JANDOSOFT • {{ activeWorldId ? 'mundo local' : 'offline' }} ✓</div>
 
       <Transition name="fade">
-        <ResourceBar v-show="showUI" class="absolute left-0 right-0 z-30" style="top: env(safe-area-inset-top, 0px);" />
+        <ResourceBar v-show="showUI" class="absolute left-0 right-0 z-30" style="top: env(safe-area-inset-top, 24px);" />
       </Transition>
 
       <!-- Botón pausa (Esc) + chat T -->
