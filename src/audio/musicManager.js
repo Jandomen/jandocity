@@ -152,11 +152,11 @@ function playChiptune(track, fromAuto = false) {
   let step = 0
   let bassStep = 0
 
-  // Bajo continuo — con filtro en TODOS los dispositivos
+  // Bajo continuo — más fuerte en móvil para que se escuche por parlantes chicos
   bassOsc = ctx.createOscillator()
   const bassGain = ctx.createGain()
   bassOsc.type = 'square'
-  bassGain.gain.value = isAndroidLow ? 0.08 : 0.12
+  bassGain.gain.value = isMobile ? 0.18 : 0.13
   const bassFilter = ctx.createBiquadFilter()
   bassFilter.type = 'lowpass'
   bassFilter.frequency.value = 650

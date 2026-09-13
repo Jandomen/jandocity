@@ -518,7 +518,7 @@ onUnmounted(() => {
       <!-- Botón pausa (Esc) + chat T -->
       <div class="absolute top-[42px] md:top-[40px] right-2 z-30 flex items-center gap-1.5">
         <button @click="showChat=true" class="hidden md:flex px-2.5 py-1 rounded-full bg-sky-600/80 backdrop-blur border border-white/15 text-[11px] text-white hover:bg-sky-600 gap-1 items-center">💬 Chat <span class="bg-white text-sky-700 px-1 rounded text-[9px] font-black">T</span></button>
-        <button @click="togglePause" class="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur border border-white/15 text-[11px] text-white/80 hover:bg-black/70">{{ isPaused ? '▶' : '⏸' }} Pausa (Esc)</button>
+        <button @click="togglePause" class="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur border border-white/15 text-[11px] text-white/80 hover:bg-black/70">{{ isPaused ? '▶' : '⏸' }} <span class="hidden md:inline">Pausa (Esc)</span><span class="md:hidden">Pausa</span></button>
       </div>
       <!-- Now playing — debajo del botón pausa, visible en móvil y web -->
       <div v-if="audioMgr.music.currentTrack && appState==='playing' && showUI" class="absolute top-[66px] md:top-[64px] right-2 z-30 pointer-events-none">

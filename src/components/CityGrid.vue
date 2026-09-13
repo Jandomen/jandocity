@@ -422,7 +422,7 @@ async function handleCellEnter(cell) {
 <template>
   <!-- Viewport principal único w-full h-full — fondo oscuro estrellado -->
   <main
-    class="absolute inset-0 w-full h-full overflow-hidden bg-[#0a0f1e] touch-none select-none m-0 p-0"
+    class="absolute inset-0 w-full h-full overflow-hidden bg-[#0a0f1e] select-none m-0 p-0"
     @pointerdown="handlePointerDown"
     @pointermove="handlePointerMove"
     @pointerup="handlePointerUp"
