@@ -1,40 +1,57 @@
 package com.jandocity.app;
 
+import android.graphics.Color;
 import android.os.Bundle;
+import android.view.View;
 import android.view.WindowManager;
 import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+
+    private void applyImmersive() {
+        View decor = getWindow().getDecorView();
+        WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(getWindow(), decor);
+        if (controller != null) {
+            controller.hide(WindowInsetsCompat.Type.systemBars());
+            controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // Ventana contenida: nunca debajo de hora/senal ni de los 3 botones
+        // FULLSCREEN IMMERSIVE: WebView ocupa toda la ventana, edge-to-edge
         getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        // true = WebView NO se extiende bajo system bars, respeta barras opacas
-        WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
-        WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
-        if (controller != null) {
-            controller.show(androidx.core.view.WindowInsetsCompat.Type.systemBars());
-            controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_DEFAULT);
-        }
-        // Android 15 edge-to-edge: aplica padding top/bottom a content y al WebView
+        getWindow().setStatusBarColor(Color.TRANSPARENT);
+        getWindow().setNavigationBarColor(Color.TRANSPARENT);
+        // false = contenido se extiende bajo barras (edge-to-edge), nosotros gestionamos insets en CSS/JS
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        applyImmersive();
+
+        // Mantener barras transparentes y re-aplicar recorte de notch/cutout
         try {
             androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content), (v, insets) -> {
-                int top = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars()).top;
-                int bottom = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars()).bottom;
-                // gestos vs 3 botones: ambos cubiertos con bottom
-                v.setPadding(v.getPaddingLeft(), top, v.getPaddingRight(), bottom);
-                // tambien asegura WebView interno si existe
-                try {
-                    if (getBridge() != null && getBridge().getWebView() != null) {
-                        android.view.View wv = getBridge().getWebView();
-                        wv.setPadding(wv.getPaddingLeft(), 0, wv.getPaddingRight(), 0);
-                    }
-                } catch (Exception ignored) {}
-                return insets;
+                // No aplicamos padding nativo: dejamos que CSS env(safe-area-inset-*) + display-cutout maneje notch
+                // Solo consumimos insets para que el sistema no reserve espacio opaco
+                return WindowInsetsCompat.CONSUMED;
             });
         } catch (Exception e) {}
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            applyImmersive();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        applyImmersive();
     }
 }

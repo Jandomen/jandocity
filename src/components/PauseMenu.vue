@@ -18,7 +18,12 @@ const single = useSinglePlayerStore()
 const city = useCityStore()
 const traffic = useTrafficStore()
 const isMobile = computed(() => typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '') || (typeof window !== 'undefined' && window.innerWidth < 768))
+const isNative = computed(() => { try { return window.Capacitor?.isNativePlatform?.() } catch { return false } })
 function setJoystick(t) { emit('update:joystickType', t) }
+async function exitAppNative() {
+  try { const { Capacitor } = await import('@capacitor/core'); if (Capacitor.isNativePlatform()) { try { await Capacitor.Plugins?.App?.exitApp?.() } catch {} try { window.Capacitor?.Plugins?.App?.exitApp?.() } catch {} return } } catch {}
+  try { window.close() } catch {}
+}
 function openCharacterSelect() {
   try { window.dispatchEvent(new CustomEvent('open-character-select')) } catch {}
 }
@@ -84,6 +89,7 @@ function toggleCoopSetting(key) {
             <button @click="openCharacterSelect" class="w-full py-3 rounded-xl bg-[#1e293b] hover:bg-[#334155] text-white font-black border-2 border-[#38bdf8] shadow-[0_4px_0_#0f172a] flex items-center justify-center gap-2">👤 Cambiar protagonista</button>
             <button v-if="single.isActive" @click="emit('surrender')" class="w-full py-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-black border-2 border-amber-400 shadow-[0_4px_0_#92400e]">🏳️ Claudicar</button>
             <button @click="emit('exit')" class="w-full py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black border-2 border-red-400 shadow-[0_4px_0_#7f1d1d]">‹ Menú</button>
+            <button v-if="isNative" @click="exitAppNative" class="w-full py-3 rounded-xl bg-black hover:bg-zinc-900 text-white font-black border-2 border-white/20 shadow-[0_4px_0_#000] flex items-center justify-center gap-2">🚪 Salir del juego</button>
             <button @click="tab='cuenta'" class="w-full py-2.5 rounded-xl bg-black/30 border border-white/10 text-white/60 text-xs font-bold hover:text-white hover:bg-white/5">⚙️ Cuenta y datos</button>
             <div v-if="single.isActive" class="bg-black/30 rounded-xl border-2 border-[#334155] p-3">
               <div class="text-xs font-black text-white">📊 Métricas</div>

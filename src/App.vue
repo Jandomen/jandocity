@@ -55,10 +55,10 @@ const isNative = computed(() => {
   return false
 })
 const containerStyle = computed(() => {
-  // Nativo: Android ya aplica WindowInsets via MainActivity (decorFitsSystemWindows=true) + status/navigation bars opacas.
-  // No usar env fallback 24/48 aquí para no duplicar padding y evitar que quede debajo de los 3 botones.
+  // IMMERSIVE: WebView ocupa toda la ventana (edge-to-edge, barras ocultas).
+  // No poner padding en el contenedor: el mapa va fullscreen.
+  // Los elementos UI usan env(safe-area) individualmente para respetar notch/cutout.
   if (isNative.value) return {}
-  // Web/iOS: usa env(safe-area) con viewport-fit=cover
   return {
     paddingTop: 'env(safe-area-inset-top, 0px)',
     paddingBottom: 'env(safe-area-inset-bottom, 0px)',
@@ -66,7 +66,17 @@ const containerStyle = computed(() => {
     paddingRight: 'env(safe-area-inset-right, 0px)'
   }
 })
-const resourceBarTop = computed(() => isNative.value ? '0px' : 'env(safe-area-inset-top, 0px)')
+const resourceBarTop = computed(() => 'env(safe-area-inset-top, 0px)')
+const pauseControlsTop = computed(() => 'calc(env(safe-area-inset-top, 0px) + 8px)')
+// Botón interno ⚙️ para immersive (no depender de back/gestos)
+async function handleInternalExit() {
+  if (isNative.value) {
+    try { const { Capacitor: Cap } = await import('@capacitor/core'); if (Cap.isNativePlatform()) { try { await Cap.Plugins?.App?.exitApp?.() } catch {} try { window.Capacitor?.Plugins?.App?.exitApp?.() } catch {} return } } catch {}
+    try { history.back() } catch {}
+  } else {
+    try { window.close() } catch {}
+  }
+}
 // fuerza clase global para CSS nativo (aunque sea tablet landscape 1280px) — exhaustivo
 function applyNativeClass() { try { document.documentElement.classList.toggle('is-native', !!isNative.value); document.body?.classList.toggle('is-native', !!isNative.value) } catch {} }
 watch(isNative, applyNativeClass, { immediate: true })
@@ -555,8 +565,10 @@ onUnmounted(() => {
         <ResourceBar v-show="showUI" class="absolute left-0 right-0 z-30" :style="{ top: resourceBarTop }" />
       </Transition>
 
+      <!-- Botón interno ⚙️ pausa — siempre visible en juego, respeta notch, no depende de navegación sistema -->
+      <button v-if="appState==='playing' && !isPaused && !showVictory" @click="togglePause" class="absolute right-2 z-30 w-10 h-10 rounded-full bg-black/60 backdrop-blur border border-white/20 text-white flex items-center justify-center text-lg shadow-[0_2px_8px_rgba(0,0,0,0.4)] active:scale-95" :style="{ top: pauseControlsTop }" title="Pausa">⚙️</button>
       <!-- Botón pausa + mute separado + chat T -->
-      <div class="absolute top-[42px] md:top-[40px] right-2 z-30 flex items-center gap-1.5">
+      <div class="absolute right-2 z-30 flex items-center gap-1.5" :style="{ top: isNative ? 'calc(env(safe-area-inset-top, 0px) + 48px)' : 'calc(env(safe-area-inset-top, 0px) + 42px)' }">
         <button @click="showChat=true" class="hidden md:flex px-2.5 py-1 rounded-full bg-sky-600/80 backdrop-blur border border-white/15 text-[11px] text-white hover:bg-sky-600 gap-1 items-center">💬 Chat <span class="bg-white text-sky-700 px-1 rounded text-[9px] font-black">T</span></button>
         <button @click="audioMgr.music.isMuted ? audioMgr.music.unmute(0.34) : audioMgr.music.mute()" class="px-2.5 py-1 rounded-full backdrop-blur border text-[11px] hover:bg-black/70 flex items-center gap-1" :class="audioMgr.music.isMuted ? 'bg-red-600/80 border-white/15 text-white' : 'bg-black/60 border-white/15 text-white/80'">{{ audioMgr.music.isMuted ? '🔇' : '🔊' }} <span class="hidden md:inline">{{ audioMgr.music.isMuted ? 'Mute' : 'Sonido' }}</span></button>
         <button @click="togglePause" class="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur border border-white/15 text-[11px] text-white/80 hover:bg-black/70">{{ isPaused ? '▶' : '⏸' }} <span class="hidden md:inline">Pausa (Esc)</span><span class="md:hidden">Pausa</span></button>
