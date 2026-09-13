@@ -1,17 +1,19 @@
 import { ref } from 'vue'
 import { Capacitor } from '@capacitor/core'
 
-const status = ref('idle') // idle | checking | downloading | ready | error | upToDate
+const status = ref('idle') // idle | checking | available | downloading | ready | error | upToDate
 const progress = ref(0)
 const remoteVersion = ref(null)
 const localVersion = ref('0.0.0')
-const THROTTLE_MS = 30 * 60 * 1000 // 30 min entre checks
+const pendingUpdate = ref(null) // { version, url, notes }
+const THROTTLE_MS = 30 * 60 * 1000
 const LAST_CHECK_KEY = 'jandocity-last-update-check'
 const APPLIED_KEY = 'jandocity-applied-version'
 const FAILED_KEY = 'jandocity-failed-version'
+const DISMISSED_KEY = 'jandocity-dismissed-version'
 
 function canCheck() {
-  if (!Capacitor.isNativePlatform()) return false
+  if (!Capacitor.isNativePlatform()) return true // web also can check manifest for prompt
   if (!navigator.onLine) return false
   try {
     const last = parseInt(localStorage.getItem(LAST_CHECK_KEY) || '0', 10)
@@ -27,44 +29,48 @@ async function getCurrentVersion() {
     if (cur?.bundle?.version) return cur.bundle.version
     if (cur?.version) return cur.version
   } catch {}
-  try { return localStorage.getItem(APPLIED_KEY) || '0.1.17' } catch { return '0.1.17' }
+  try { return localStorage.getItem(APPLIED_KEY) || '0.1.30' } catch { return '0.1.30' }
+}
+
+function compareVersions(a, b) {
+  const pa = a.split('.').map(Number)
+  const pb = b.split('.').map(Number)
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const na = pa[i] || 0
+    const nb = pb[i] || 0
+    if (na > nb) return 1
+    if (na < nb) return -1
+  }
+  return 0
 }
 
 export function useAutoUpdater() {
   async function checkAndUpdate(force = false) {
-    if (!Capacitor.isNativePlatform()) return { skipped: 'web' }
+    // No auto-descarga más: solo avisa si hay update
     if (!navigator.onLine) return { skipped: 'offline' }
     if (!force && !canCheck()) return { skipped: 'throttled' }
 
     status.value = 'checking'
+    progress.value = 0
     try { localStorage.setItem(LAST_CHECK_KEY, String(Date.now())) } catch {}
 
     try {
-      const { CapacitorUpdater } = await import('@capgo/capacitor-updater')
-      // Notifica que el bundle actual está OK — evita rollback de Capgo
-      await CapacitorUpdater.notifyAppReady().catch(() => {})
-
       const currentVer = await getCurrentVersion()
       localVersion.value = currentVer
 
-      // 1) intenta Capgo getLatest (si tienes channel configurado)
-      let update = null
-      try { update = await CapacitorUpdater.getLatest().catch(() => null) } catch {}
-      if (update && update.version && update.version !== currentVer && update.url) {
-        const failed = localStorage.getItem(FAILED_KEY)
-        if (failed === update.version) { status.value = 'idle'; return { skipped: 'failed-before' } }
-        remoteVersion.value = update.version
-        status.value = 'downloading'
-        const dl = await CapacitorUpdater.download({ url: update.url, version: update.version })
-        if (dl) {
-          await CapacitorUpdater.set(dl)
-          try { localStorage.setItem(APPLIED_KEY, update.version) } catch {}
-          status.value = 'ready'
-          return { updated: true, version: update.version, restartOnNextLaunch: true }
-        }
-      }
+      // 1) intenta Capgo getLatest si está configurado
+      let capVer = null, capUrl = null
+      try {
+        const { CapacitorUpdater } = await import('@capgo/capacitor-updater')
+        await CapacitorUpdater.notifyAppReady().catch(() => {})
+        const latest = await CapacitorUpdater.getLatest().catch(() => null)
+        if (latest?.version && latest?.url) { capVer = latest.version; capUrl = latest.url }
+      } catch {}
 
-      // 2) fallback manual: tu version.json en Vercel/Supabase
+      const candidates = []
+      if (capVer && capUrl) candidates.push({ version: capVer, url: capUrl, notes: 'Capgo' })
+
+      // 2) fallback manual: version.json / manifest.json
       const urls = [
         'https://jandocity.vercel.app/version.json',
         'https://adqhqvzkqdhujjipabgf.supabase.co/storage/v1/object/public/updates/manifest.json',
@@ -74,35 +80,113 @@ export function useAutoUpdater() {
           const res = await fetch(u, { cache: 'no-store' })
           if (!res.ok) continue
           const data = await res.json()
-          const ver = data.version
-          const url = data.url
-          if (!ver || !url) continue
-          remoteVersion.value = ver
-          if (ver === currentVer) { status.value = 'idle'; return { upToDate: true } }
-          const failed = localStorage.getItem(FAILED_KEY)
-          if (failed === ver) { status.value = 'idle'; return { skipped: 'failed-before' } }
-          const applied = localStorage.getItem(APPLIED_KEY)
-          if (applied === ver) { status.value = 'idle'; return { upToDate: true } }
-          status.value = 'downloading'
-          const dl = await CapacitorUpdater.download({ url, version: ver })
-          if (dl) {
-            await CapacitorUpdater.set(dl)
-            try { localStorage.setItem(APPLIED_KEY, ver) } catch {}
-            status.value = 'ready'
-            // No forzamos reload inmediato — se aplica al próximo cold start para no molestar la partida
-            return { updated: true, version: ver, restartOnNextLaunch: true }
-          }
+          if (data.version && data.url) candidates.push({ version: data.version, url: data.url, notes: data.notes || '' })
         } catch {}
       }
 
-      status.value = 'idle'
-      return { upToDate: true }
+      // elige el candidato más nuevo > current
+      let best = null
+      for (const c of candidates) {
+        if (compareVersions(c.version, currentVer) <= 0) continue
+        const dismissed = localStorage.getItem(DISMISSED_KEY)
+        if (dismissed === c.version && !force) continue
+        const failed = localStorage.getItem(FAILED_KEY)
+        if (failed === c.version) continue
+        const applied = localStorage.getItem(APPLIED_KEY)
+        if (applied === c.version) continue
+        if (!best || compareVersions(c.version, best.version) > 0) best = c
+      }
+
+      if (!best) {
+        status.value = 'idle'
+        return { upToDate: true, current: currentVer }
+      }
+
+      remoteVersion.value = best.version
+      pendingUpdate.value = best
+      status.value = 'available'
+      return { available: true, version: best.version, update: best }
     } catch (e) {
       status.value = 'error'
       console.warn('[updater]', e)
-      try { localStorage.setItem(FAILED_KEY, remoteVersion.value || 'unknown') } catch {}
       return { error: e.message }
     }
+  }
+
+  async function startUpdate() {
+    const upd = pendingUpdate.value
+    if (!upd) return { error: 'no pending' }
+    const isNative = Capacitor.isNativePlatform()
+
+    if (!isNative) {
+      // Web: no hay zip, solo recarga para tomar nuevo deploy Vercel
+      status.value = 'downloading'
+      progress.value = 12
+      await new Promise(r => setTimeout(r, 280))
+      progress.value = 45
+      await new Promise(r => setTimeout(r, 250))
+      progress.value = 100
+      status.value = 'ready'
+      // recarga suave tras 800ms
+      setTimeout(() => window.location.reload(), 800)
+      return { updated: true, web: true }
+    }
+
+    status.value = 'downloading'
+    progress.value = 0
+
+    // barra animada mientras Capgo descarga (no hay evento nativo fiable en todas versiones)
+    let progTimer = null
+    progTimer = setInterval(() => {
+      if (progress.value < 88) progress.value = Math.min(88, progress.value + Math.random() * 9 + 2)
+    }, 260)
+
+    // intenta listener nativo si existe
+    let listener = null
+    try {
+      const { CapacitorUpdater } = await import('@capgo/capacitor-updater')
+      try { listener = await CapacitorUpdater.addListener('downloadProgress', (e) => { if (typeof e?.percent === 'number') progress.value = Math.min(99, Math.max(progress.value, e.percent)) }) } catch {}
+      const dl = await CapacitorUpdater.download({ url: upd.url, version: upd.version })
+      clearInterval(progTimer)
+      if (listener?.remove) try { listener.remove() } catch {}
+      if (!dl) throw new Error('download failed')
+      progress.value = 97
+      await CapacitorUpdater.set(dl)
+      try { localStorage.setItem(APPLIED_KEY, upd.version) } catch {}
+      progress.value = 100
+      status.value = 'ready'
+      return { updated: true, version: upd.version, restartOnNextLaunch: true }
+    } catch (e) {
+      clearInterval(progTimer)
+      if (listener?.remove) try { listener.remove() } catch {}
+      status.value = 'error'
+      progress.value = 0
+      try { localStorage.setItem(FAILED_KEY, upd.version) } catch {}
+      console.warn('[updater download]', e)
+      return { error: e.message }
+    }
+  }
+
+  function dismissUpdate() {
+    if (pendingUpdate.value?.version) {
+      try { localStorage.setItem(DISMISSED_KEY, pendingUpdate.value.version) } catch {}
+    }
+    pendingUpdate.value = null
+    remoteVersion.value = null
+    progress.value = 0
+    status.value = 'idle'
+  }
+
+  function clearDismissed() { try { localStorage.removeItem(DISMISSED_KEY) } catch {} }
+
+  async function applyReadyAndRestart() {
+    try {
+      const { CapacitorUpdater } = await import('@capgo/capacitor-updater')
+      // en algunos builds reloadApp es necesario; si no, el set ya aplica en next cold start
+      try { await CapacitorUpdater.reloadApp?.() } catch {}
+      // fallback web reload
+      window.location.reload()
+    } catch { window.location.reload() }
   }
 
   function listenOnline() {
@@ -119,5 +203,5 @@ export function useAutoUpdater() {
     })
   }
 
-  return { status, progress, remoteVersion, localVersion, checkAndUpdate, listenOnline }
+  return { status, progress, remoteVersion, localVersion, pendingUpdate, checkAndUpdate, startUpdate, dismissUpdate, clearDismissed, applyReadyAndRestart, listenOnline }
 }

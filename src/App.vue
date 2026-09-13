@@ -42,6 +42,7 @@ import CharacterSelect from '@/components/CharacterSelect.vue'
 import { APP_URL } from '@/config.js'
 import { usePerformance } from '@/composables/usePerformance.js'
 import { Capacitor } from '@capacitor/core'
+import UpdatePrompt from '@/components/UpdatePrompt.vue'
 
 const city = useCityStore()
 const player = usePlayerStore()
@@ -617,6 +618,7 @@ onUnmounted(() => {
     <!-- Auth multijugador (fuera de la cadena v-if) -->
     <AuthModal :show="showAuth" @close="showAuth=false" @authenticated="onAuthenticated" />
     <CharacterSelect :show="showCharacterSelect" @select="handleCharacterSelect" @close="handleCharacterClose" />
+    <UpdatePrompt />
     <div v-if="appState==='menu' && isLogged" class="absolute top-2 right-2 z-30">
       <button @click="doLogout" class="px-2.5 py-1 rounded-full bg-black/60 border border-white/15 text-[11px] text-white">Salir</button>
     </div>
