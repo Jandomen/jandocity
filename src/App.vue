@@ -47,10 +47,16 @@ const city = useCityStore()
 const player = usePlayerStore()
 const isNative = computed(() => {
   try { if (Capacitor.isNativePlatform()) return true } catch {}
-  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '')
+  try { if (window.Capacitor?.isNativePlatform?.()) return true } catch {}
+  const ua = navigator.userAgent || ''
+  if (/Android|iPhone|iPad|iPod|wv/i.test(ua)) return true
+  if (location.protocol === 'capacitor:' || location.href.includes('capacitor://')) return true
+  return false
 })
-// fuerza clase global para CSS nativo (aunque sea tablet landscape 1280px)
-watch(isNative, (v) => { try { document.documentElement.classList.toggle('is-native', !!v) } catch {} }, { immediate: true })
+// fuerza clase global para CSS nativo (aunque sea tablet landscape 1280px) — exhaustivo
+function applyNativeClass() { try { document.documentElement.classList.toggle('is-native', !!isNative.value); document.body?.classList.toggle('is-native', !!isNative.value) } catch {} }
+watch(isNative, applyNativeClass, { immediate: true })
+onMounted(() => { applyNativeClass(); setTimeout(applyNativeClass, 500); setTimeout(applyNativeClass, 1500) })
 
 useAudioEvents(city)
 const audioMgr = useAudioManager()

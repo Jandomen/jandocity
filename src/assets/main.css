@@ -53,7 +53,9 @@ html, body, #app {
     scroll-behavior: auto !important;
   }
 }
-/* === FIX MODO MÓVIL NATIVO: fuerza carrusel móvil siempre en APK, aunque sea tablet 1280px === */
+/* === FIX MODO MÓVIL NATIVO: fuerza carrusel móvil siempre en APK, aunque sea tablet 1280px md:800 === */
 .is-native .lg\:flex { display: none !important; }
-.is-native .lg\:hidden { display: block !important; }
-.is-native .jandocity-mobile-carousel { display: block !important; }
+.is-native .lg\:hidden { display: flex !important; }
+.is-native .hidden.lg\:flex { display: none !important; }
+.is-native .md\:hidden { display: flex !important; }
+.is-native .hidden.md\:flex { display: none !important; }

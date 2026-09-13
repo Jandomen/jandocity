@@ -584,9 +584,9 @@ async function handleCellEnter(cell) {
       </div>
     </Transition>
 
-    <!-- Controles PC — solo desktop, ocultos en móvil/APK -->
+    <!-- Controles PC — solo desktop lg, ocultos en móvil/APK/tablet 800px -->
     <Transition name="fade">
-      <div v-show="props.showUi" class="hidden md:flex absolute left-1/2 -translate-x-1/2 bottom-[62px] z-10 items-center gap-2 bg-black/60 backdrop-blur px-3 py-1.5 rounded-full border border-white/10 text-[11px] text-white/80">
+      <div v-show="props.showUi" class="hidden lg:flex absolute left-1/2 -translate-x-1/2 bottom-[62px] z-10 items-center gap-2 bg-black/60 backdrop-blur px-3 py-1.5 rounded-full border border-white/10 text-[11px] text-white/80">
       <span>🖱️ Izq pinta • Der demuele • Central arrastra • Rueda zoom • WASD</span>
       <span class="opacity-40">|</span>
       <span class="font-mono">{{ Math.round(camera.scale.value * 100) }}%</span>
@@ -598,8 +598,8 @@ async function handleCellEnter(cell) {
       </span>
     </div>
     </Transition>
-    <!-- Botones flotantes transparentes solo móvil/APK — izquierda (joystick va a la derecha) -->
-    <div class="md:hidden absolute bottom-4 left-4 z-30 flex flex-col gap-2 pointer-events-auto">
+    <!-- Botones flotantes solo móvil/APK — lg:hidden para landscape 800px -->
+    <div class="lg:hidden absolute bottom-4 left-4 z-30 flex flex-col gap-2 pointer-events-auto">
       <button @click="() => { audioMgr.init(); if(audioMgr.music.isMuted) audioMgr.music.unmute(0.34); const next = audioMgr.music.next(); city.logs.unshift(`[Audio] ▶ ${audioMgr.music.tracks[next].label} (${audioMgr.music.tracks[next].mood})`); if(city.logs.length>50) city.logs.pop(); try{ (globalThis||window).dispatchEvent(new CustomEvent('track-toast', {detail: next})) }catch{} }" class="w-10 h-10 rounded-full bg-black/30 backdrop-blur border border-white/20 text-white flex items-center justify-center text-[14px]" title="Cambiar música">🎵</button>
       <button @click="() => { camera.scale.value = 1; const ox = city.offsetX ?? city.grid[0]?.[0]?.x ?? 0; const oy = city.offsetY ?? city.grid[0]?.[0]?.y ?? 0; const lx = (player.x - ox)*48+24; const ly = (player.y - oy)*48+24; camera.x.value = window.innerWidth/2 - lx*camera.scale.value; camera.y.value = window.innerHeight/2 - ly*camera.scale.value }" class="w-10 h-10 rounded-full bg-black/30 backdrop-blur border border-white/20 text-white flex items-center justify-center text-[14px]" title="Centrar 100%">⌖</button>
       <button @click="emit('openChat')" class="w-10 h-10 rounded-full bg-sky-600/50 backdrop-blur border border-white/20 text-white flex items-center justify-center text-[14px]" title="Chat (T)">💬</button>

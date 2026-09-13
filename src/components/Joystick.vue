@@ -40,7 +40,7 @@ function end() {
 </script>
 
 <template>
-  <div class="absolute bottom-4 right-4 z-30 md:hidden select-none touch-none">
+  <div class="absolute bottom-4 right-4 z-30 lg:hidden select-none touch-none">
     <div
       class="w-[112px] h-[112px] rounded-full bg-black/30 backdrop-blur border border-white/20 flex items-center justify-center"
       @touchstart.prevent="start" @touchmove.prevent="move" @touchend="end" @touchcancel="end"
