@@ -49,6 +49,8 @@ const isNative = computed(() => {
   try { if (Capacitor.isNativePlatform()) return true } catch {}
   return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '')
 })
+// fuerza clase global para CSS nativo (aunque sea tablet landscape 1280px)
+watch(isNative, (v) => { try { document.documentElement.classList.toggle('is-native', !!v) } catch {} }, { immediate: true })
 
 useAudioEvents(city)
 const audioMgr = useAudioManager()

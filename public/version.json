@@ -1,5 +1,5 @@
 {
-  "version": "0.1.19",
-  "url": "https://adqhqvzkqdhujjipabgf.supabase.co/storage/v1/object/public/updates/jandocity-0.1.19.zip",
-  "notes": "OTA 0.1.19 - fix modo movil landscape APK"
+  "version": "0.1.20",
+  "url": "https://adqhqvzkqdhujjipabgf.supabase.co/storage/v1/object/public/updates/jandocity-0.1.20.zip",
+  "notes": "OTA 0.1.20 - fuerza modo movil nativo en todos los devices"
 }

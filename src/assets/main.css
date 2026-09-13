@@ -53,3 +53,7 @@ html, body, #app {
     scroll-behavior: auto !important;
   }
 }
+/* === FIX MODO MÓVIL NATIVO: fuerza carrusel móvil siempre en APK, aunque sea tablet 1280px === */
+.is-native .lg\:flex { display: none !important; }
+.is-native .lg\:hidden { display: block !important; }
+.is-native .jandocity-mobile-carousel { display: block !important; }
