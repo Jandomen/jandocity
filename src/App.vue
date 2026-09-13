@@ -283,22 +283,36 @@ function handlePlay(worldId) {
   loadingSub.value = 'Generando terreno y edificios'
   appState.value = 'loading'
   setTimeout(() => {
-    const w = getWorld(worldId)
-    if (!w) { appState.value = 'worlds'; return }
-    city.loadFromData(w.data)
-    city.syncDerivedResources()
-    activeWorldId.value = worldId
-    setActiveWorldId(worldId)
-    // restaurar jugador si estaba en ese mundo (global por ahora)
     try {
-      const p = JSON.parse(localStorage.getItem('jandocity-player') || 'null')
-      if (p && typeof p.x === 'number' && typeof p.y === 'number') {
-        player.setPos(p.x, p.y)
-        if (p.dir) player.dir = p.dir
+      const w = getWorld(worldId)
+      if (!w) {
+        console.warn('[App] Mundo no encontrado:', worldId)
+        appState.value = 'worlds'
+        return
       }
-    } catch {}
-    appState.value = 'playing'
-    showUI.value = true
+      const result = city.loadFromData(w.data)
+      if (result && !result.ok) {
+        console.warn('[App] Error cargando mundo:', result.reason)
+        appState.value = 'worlds'
+        return
+      }
+      city.syncDerivedResources()
+      activeWorldId.value = worldId
+      setActiveWorldId(worldId)
+      // restaurar jugador si estaba en ese mundo
+      try {
+        const p = JSON.parse(localStorage.getItem('jandocity-player') || 'null')
+        if (p && typeof p.x === 'number' && typeof p.y === 'number') {
+          player.setPos(p.x, p.y)
+          if (p.dir) player.dir = p.dir
+        }
+      } catch {}
+      appState.value = 'playing'
+      showUI.value = true
+    } catch (e) {
+      console.error('[App] Error crítico cargando mundo:', e)
+      appState.value = 'worlds'
+    }
   }, 800)
 }
 
@@ -416,19 +430,8 @@ onMounted(async () => {
     // si quedan 2 y se va uno, el otro gana ya manejado arriba (1)
     // si quedan >2, sigue
   })
-  // OTA auto-update para APK offline-first: si hay internet, baja update y aplica al reiniciar
-  try {
-    const { useAutoUpdater } = await import('@/composables/useAutoUpdater.js')
-    const updater = useAutoUpdater()
-    updater.listenOnline()
-    // chequea al iniciar si hay internet
-    if (navigator.onLine) setTimeout(() => updater.checkAndUpdate(), 2500)
-    // re-chequea cada vez que vuelve a foreground
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && navigator.onLine) updater.checkAndUpdate()
-    })
-    window.__jandocityUpdater = updater
-  } catch {}
+  // OTA DESHABILITADO — causaba restarts infinitos en APK
+  // Para re-habilitar: ver useAutoUpdater.js
   // Splash 2s
   setTimeout(() => { appState.value = 'menu' }, 2000)
 

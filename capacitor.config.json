@@ -6,7 +6,7 @@
   "plugins": {
     "CapacitorUpdater": {
       "autoUpdate": false,
-      "updateUrl": "https://adqhqvzkqdhujjipabgf.supabase.co/storage/v1/object/public/updates/manifest.json",
+      "updateUrl": "",
       "statsUrl": "",
       "channelUrl": ""
     },

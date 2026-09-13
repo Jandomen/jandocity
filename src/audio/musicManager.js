@@ -149,35 +149,77 @@ function playChiptune(track, fromAuto = false) {
   const tick = isAndroidLow ? 60000 / track.bpm / 1 : isMobile ? 60000 / track.bpm / 1.3 : isLowEnd ? 60000 / track.bpm / 1.5 : 60000 / track.bpm / 2
   let step = 0
 
-  // Bajo continuo 8-bit — omitido en Android low para no trabar
-  if (!isAndroidLow) {
-    bassOsc = ctx.createOscillator()
-    const bassGain = ctx.createGain()
-    bassOsc.type = 'square'
-    bassGain.gain.value = isLowEnd ? 0.09 : 0.13
-    if (isLowEnd) {
-      bassOsc.connect(bassGain); bassGain.connect(gainNode)
-    } else {
-      const bassFilter = ctx.createBiquadFilter()
-      bassFilter.type = 'lowpass'
-      bassFilter.frequency.value = 650
-      bassOsc.connect(bassGain); bassGain.connect(bassFilter); bassFilter.connect(gainNode)
-      currentOscs.push(bassFilter)
-    }
-    bassOsc.start()
-    currentOscs.push(bassOsc, bassGain)
+  // Bajo continuo 8-bit — simplificado en móvil
+  bassOsc = ctx.createOscillator()
+  const bassGain = ctx.createGain()
+  bassOsc.type = 'square'
+  bassGain.gain.value = isAndroidLow ? 0.07 : isLowEnd ? 0.09 : 0.13
+  if (isLowEnd || isAndroidLow) {
+    bassOsc.connect(bassGain); bassGain.connect(gainNode)
+  } else {
+    const bassFilter = ctx.createBiquadFilter()
+    bassFilter.type = 'lowpass'
+    bassFilter.frequency.value = 650
+    bassOsc.connect(bassGain); bassGain.connect(bassFilter); bassFilter.connect(gainNode)
+    currentOscs.push(bassFilter)
   }
+  bassOsc.start()
+  currentOscs.push(bassOsc, bassGain)
 
   let bassStep = 0
-  intervalId = setInterval(() => {
-    if (isAndroidLow && step % 2 === 1) { step++; return }
+  // Drift-corrected scheduler — reemplaza setInterval que se throttlea en móvil
+  // Usa performance.now() para medir tiempo real y catch-up si el browser retrasa
+  let _stopFlag = false
+  const _origStop = stopCurrent
+  const wrappedStop = () => { _stopFlag = true; _origStop() }
+  // patch temporal: reemplazamos stopCurrent con version que mata el loop
+  const realStopCurrent = stopCurrent
+  stopCurrent = () => {
+    _stopFlag = true
+    clearTimeout(autoTimeout)
+    clearTimeout(fadeTimeout)
+    for (const o of currentOscs) try { o.stop(); o.disconnect() } catch {}
+    currentOscs = []
+    if (intervalId) { clearTimeout(intervalId); intervalId = null }
+    if (bassOsc) try { bassOsc.stop(); bassOsc.disconnect() } catch {}
+    bassOsc = null
+  }
+  let lastTime = performance.now()
+  let accumulator = 0
+  function schedulerLoop() {
+    if (_stopFlag) return
+    const now = performance.now()
+    let elapsed = now - lastTime
+    lastTime = now
+    // Si elapsed es absurdo (>500ms) el browser estuvo throttled — catch-up rápido
+    if (elapsed > 500) elapsed = tick * 0.1
+    accumulator += elapsed
+    // Catch-up: si hay mucho acumulado, tocar varios steps de golpe (max 4)
+    let stepsToPlay = 0
+    while (accumulator >= tick && stepsToPlay < 4) {
+      accumulator -= tick
+      stepsToPlay++
+    }
+    for (let i = 0; i < stepsToPlay; i++) {
+      playStep(track, step, bassStep, ctx, tick, isMobile, isLowEnd, isAndroidLow)
+      if (!isAndroidLow && step % 2 === 0) {
+        const bSemi = track.bass[bassStep % track.bass.length]
+        const bFreq = (track.base * 0.5) * Math.pow(2, bSemi/12)
+        bassOsc.frequency.linearRampToValueAtTime(bFreq, ctx.currentTime + 0.04)
+        bassStep++
+      }
+      step++
+    }
+    if (stepsToPlay > 0) accumulator = 0 // limpiar para no acumular
+    intervalId = setTimeout(schedulerLoop, Math.max(10, tick * 0.8))
+  }
+  function playStep(track, step, bassStep, ctx, tick, isMobile, isLowEnd, isAndroidLow) {
     const semi = track.melody[step % track.melody.length]
     const freq = track.base * Math.pow(2, semi/12)
     const osc = ctx.createOscillator()
     const gain = ctx.createGain()
     osc.type = 'square'
     osc.frequency.value = freq
-    // envolvente 8-bit con duty + variación sutil por ritmo
     const vel = isLowEnd ? 0.28 : 0.34 + (step % 4 === 0 ? 0.06 : 0) + (Math.random()*0.04)
     gain.gain.setValueAtTime(0, ctx.currentTime)
     gain.gain.linearRampToValueAtTime(vel, ctx.currentTime + 0.008)
@@ -196,9 +238,7 @@ function playChiptune(track, fromAuto = false) {
     const isMobile2 = typeof window !== 'undefined' && window.innerWidth < 768
     if (currentOscs.length > (isAndroidLow ? 8 : isMobile2 ? 12 : isLowEnd ? 14 : 24)) currentOscs.splice(0,3)
 
-    // ritmo por pista — en móvil se simplifica mucho para no trabar
-    const isMobile3 = typeof window !== 'undefined' && window.innerWidth < 768
-    if (!isLowEnd && !isMobile3 && !isAndroidLow) {
+    if (!isLowEnd && !isAndroidLow) {
       const isTechno = ['techno','house','trance','hardcore','ambient_techno','electro'].includes(Object.keys(TRACKS).find(k=>TRACKS[k]===track))
       const isCalm = ['calma','noche','serenidad','paz'].includes(Object.keys(TRACKS).find(k=>TRACKS[k]===track))
       if (isTechno) {
@@ -224,16 +264,8 @@ function playChiptune(track, fromAuto = false) {
         currentOscs.push(hOsc, hGain, hFilt)
       }
     }
-
-    // Bajo cambia cada 2 pasos (blanca) con variación — omitido en Android low
-    if (!isAndroidLow && step % 2 === 0) {
-      const bSemi = track.bass[bassStep % track.bass.length]
-      const bFreq = (track.base * 0.5) * Math.pow(2, bSemi/12)
-      bassOsc.frequency.linearRampToValueAtTime(bFreq, ctx.currentTime + 0.04)
-      bassStep++
-    }
-    step++
-  }, tick)
+  }
+  schedulerLoop()
 }
 
 export function createMusicManager() {
