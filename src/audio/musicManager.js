@@ -1,14 +1,17 @@
 /**
- * src/audio/musicManager.js — 8-bit chiptune, 25 pistas compuestas como compositor
- * Cada pista: tonalidad, progresión, melodía 16 pasos, bajo y mood. N para siguiente.
+ * src/audio/musicManager.js — 8-bit chiptune saneado: anti-desincronización
+ * Fix: stop único, generación anti-race, fades cancelados, scheduler estable.
  */
 
 let audioCtx = null
 let gainNode = null
+let filterNode = null
 let currentOscs = []
 let isMuted = false
 let intervalId = null
 let bassOsc = null
+let generation = 0
+
 const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '')
 const isLowEnd = typeof navigator !== 'undefined' && (isAndroid ? ((navigator.deviceMemory || 4) <= 4 || (navigator.hardwareConcurrency || 4) <= 4) : ((navigator.deviceMemory || 4) <= 2 || (navigator.hardwareConcurrency || 4) <= 2)) || !!navigator.connection?.saveData
 const isAndroidLow = isAndroid && isLowEnd
@@ -27,13 +30,13 @@ function getContext() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)()
     gainNode = audioCtx.createGain()
-    gainNode.gain.value = 0.34
+    gainNode.gain.value = isMuted ? 0 : 0.34
     if (!isAndroidLow) {
-      const filter = audioCtx.createBiquadFilter()
-      filter.type = 'lowpass'
-      filter.frequency.value = 2800
-      gainNode.connect(filter)
-      filter.connect(audioCtx.destination)
+      filterNode = audioCtx.createBiquadFilter()
+      filterNode.type = 'lowpass'
+      filterNode.frequency.value = 2800
+      gainNode.connect(filterNode)
+      filterNode.connect(audioCtx.destination)
     } else {
       gainNode.connect(audioCtx.destination)
     }
@@ -41,9 +44,8 @@ function getContext() {
   return audioCtx
 }
 
-// 55 pistas — 25 originales + 20 pedidas + 10 tecno/electrónica
+// 55 pistas
 const TRACKS = {
-  // 1-15 originales mejoradas con melodía compuesta
   amanecer: { base: 220, mood: 'Esperanza', color: '#fde68a', label: 'Amanecer 8-bit', key: 'A mayor', bpm: 108, prog: 'I-V-vi-IV', melody: [0,4,7,12, 7,4,2,4, 0,4,7,12, 14,12,7,4], bass: [0,0,5,5, 0,0,9,9] },
   melancolia: { base: 165, mood: 'Melancolía', color: '#94a3b8', label: 'Melancolía 8-bit', key: 'E menor', bpm: 72, prog: 'i-VI-III-VII', melody: [0,3,7,10, 7,3,2,3, 0,3,7,10, 12,10,7,3], bass: [0,0,3,3, 8,8,7,7] },
   felicidad: { base: 330, mood: 'Felicidad', color: '#facc15', label: 'Felicidad 8-bit', key: 'E mayor', bpm: 132, prog: 'I-IV-V-I', melody: [0,4,7,12, 12,9,7,4, 0,2,4,7, 9,7,4,2], bass: [0,0,5,5, 7,7,0,0] },
@@ -59,7 +61,6 @@ const TRACKS = {
   victoria: { base: 440, mood: 'Victoria', color: '#fde047', label: 'Victoria 8-bit', key: 'A mayor', bpm: 140, prog: 'I-V-vi-IV', melody: [0,4,7,12, 14,12,7,4, 0,4,7,12, 16,12,7,4], bass: [0,0,7,7, 9,9,5,5] },
   construccion: { base: 260, mood: 'Construcción', color: '#fdba74', label: 'Construcción 8-bit', key: 'C menor', bpm: 116, prog: 'i-VI-III-VII', melody: [0,5,7,12, 10,7,5,3, 0,5,7,10, 7,5,3,0], bass: [0,0,8,8, 3,3,10,10] },
   ensueno: { base: 208, mood: 'Ensueño', color: '#67e8f9', label: 'Ensueño 8-bit', key: 'G# mayor', bpm: 82, prog: 'I-iii-vi-IV', melody: [0,3,7,10, 12,10,7,5, 0,3,7,10, 9,7,5,3], bass: [0,0,4,4, 9,9,5,5] },
-  // 10 nuevas — composición fresca
   aurora: { base: 294, mood: 'Aurora', color: '#f0abfc', label: 'Aurora boreal 8-bit', key: 'D mayor', bpm: 96, prog: 'I-iii-IV-V', melody: [0,4,7,9, 12,9,7,4, 2,4,7,11, 9,7,4,2], bass: [0,0,4,4, 5,5,7,7] },
   lluvia: { base: 175, mood: 'Lluvia', color: '#7dd3fc', label: 'Lluvia 8-bit', key: 'A# menor', bpm: 78, prog: 'i-iv-VI-iv', melody: [0,3,5,8, 10,8,5,3, 0,3,6,8, 6,5,3,0], bass: [0,0,5,5, 8,8,5,5] },
   desierto: { base: 165, mood: 'Desierto', color: '#fbbf24', label: 'Desierto 8-bit', key: 'E frigio', bpm: 88, prog: 'i-II-VII-i', melody: [0,1,5,7, 8,7,5,1, 0,1,5,8, 7,5,1,0], bass: [0,0,1,1, 10,10,0,0] },
@@ -70,7 +71,6 @@ const TRACKS = {
   feria: { base: 360, mood: 'Feria', color: '#facc15', label: 'Feria 8-bit', key: 'C mayor', bpm: 145, prog: 'I-IV-V-I', melody: [0,4,7,12, 12,11,9,7, 0,4,7,9, 7,4,2,0], bass: [0,0,5,5, 7,7,0,0] },
   subterraneo: { base: 100, mood: 'Subterráneo', color: '#57534e', label: 'Subterráneo 8-bit', key: 'D# menor', bpm: 74, prog: 'i-VI-iv-V', melody: [0,1,4,6, 8,6,4,1, 0,1,4,6, 6,4,1,0], bass: [0,0,8,8, 5,5,7,7] },
   estelar: { base: 380, mood: 'Estelar', color: '#c4b5fd', label: 'Estelar 8-bit', key: 'E mayor', bpm: 118, prog: 'I-iii-vi-V', melody: [0,4,7,12, 14,12,9,7, 0,4,7,11, 12,11,7,4], bass: [0,0,4,4, 9,9,7,7] },
-  // 20 nuevas — estilos pedidos
   soledad: { base: 132, mood: 'Soledad', color: '#64748b', label: 'Soledad 8-bit', key: 'D menor', bpm: 66, prog: 'i-VI-III-VII', melody: [0,3,7,10, 8,5,3,1, 0,2,3,7, 10,7,3,0], bass: [0,0,8,8, 3,3,10,10] },
   amor: { base: 260, mood: 'Amor', color: '#fb7185', label: 'Amor 8-bit', key: 'A mayor', bpm: 86, prog: 'I-V-vi-IV', melody: [0,4,7,12, 11,7,4,2, 0,2,4,7, 9,7,4,0], bass: [0,0,7,7, 9,9,5,5] },
   romance: { base: 228, mood: 'Romance', color: '#f472b6', label: 'Romance 8-bit', key: 'F mayor', bpm: 82, prog: 'I-vi-IV-V', melody: [0,4,7,11, 12,11,7,4, 0,4,7,9, 7,4,2,0], bass: [0,0,9,9, 5,5,7,7] },
@@ -91,7 +91,6 @@ const TRACKS = {
   sueno: { base: 182, mood: 'Sueño', color: '#bae6fd', label: 'Sueño 8-bit', key: 'Ab mayor', bpm: 72, prog: 'I-vi-IV-V', melody: [0,4,7,12, 10,7,4,0, 0,2,4,7, 9,7,4,0], bass: [0,0,9,9, 5,5,7,7] },
   recuerdo: { base: 198, mood: 'Recuerdo', color: '#ddd6fe', label: 'Recuerdo 8-bit', key: 'Eb mayor', bpm: 78, prog: 'I-iii-IV-V', melody: [0,3,7,12, 10,7,3,0, 0,3,7,10, 12,10,7,3], bass: [0,0,4,4, 5,5,8,8] },
   despedida: { base: 158, mood: 'Despedida', color: '#9ca3af', label: 'Despedida 8-bit', key: 'B menor', bpm: 64, prog: 'i-iv-VI-V', melody: [0,3,7,10, 8,6,3,0, 0,3,5,7, 7,5,3,0], bass: [0,0,5,5, 8,8,3,3] },
-  // 10 tecno / electrónica — 2min cada una con fade
   techno: { base: 138, mood: 'Techno', color: '#06b6d4', label: 'Techno 8-bit', key: 'A menor', bpm: 128, prog: 'i-VI-III-VII', melody: [0,3,7,12, 10,7,3,5, 0,3,7,10, 12,10,7,3], bass: [0,0,5,5, 3,3,8,8] },
   electronica: { base: 144, mood: 'Electrónica', color: '#8b5cf6', label: 'Electrónica 8-bit', key: 'F# menor', bpm: 122, prog: 'i-iv-VI-V', melody: [0,5,7,12, 7,5,3,5, 0,5,7,10, 7,5,3,0], bass: [0,0,5,5, 8,8,7,7] },
   house: { base: 126, mood: 'House', color: '#f97316', label: 'House 8-bit', key: 'C menor', bpm: 126, prog: 'i-VI-iv-V', melody: [0,3,7,10, 12,10,7,3, 0,5,7,10, 10,7,5,0], bass: [0,0,8,8, 5,5,3,3] },
@@ -111,195 +110,173 @@ let currentIndex = TRACK_ORDER.indexOf(currentTrackId)
 
 let autoTimeout = null
 let fadeTimeout = null
+let nextTimeout = null
 
-function fadeTo(target, duration = 1.8) {
+function fadeTo(target, duration = 1.2) {
   const ctx = getContext()
-  const start = gainNode.gain.value
-  gainNode.gain.cancelScheduledValues(ctx.currentTime)
-  gainNode.gain.setValueAtTime(start, ctx.currentTime)
-  gainNode.gain.linearRampToValueAtTime(Math.max(0, Math.min(1, target)), ctx.currentTime + duration)
+  try {
+    gainNode.gain.cancelScheduledValues(ctx.currentTime)
+    const cur = gainNode.gain.value
+    gainNode.gain.setValueAtTime(Math.max(0, Math.min(1, cur)), ctx.currentTime)
+    gainNode.gain.linearRampToValueAtTime(Math.max(0, Math.min(1, target)), ctx.currentTime + duration)
+  } catch {}
 }
 
 function scheduleAutoNext() {
   clearTimeout(autoTimeout)
-  // cada pista dura ~2min con fade, luego siguiente automática con desvanecimiento
+  clearTimeout(fadeTimeout)
   autoTimeout = setTimeout(() => {
-    fadeTo(0, 1.6)
+    const myGen = generation
+    fadeTo(0, 1.4)
     fadeTimeout = setTimeout(() => {
+      if (myGen !== generation) return
       const nextId = TRACK_ORDER[(currentIndex + 1) % TRACK_ORDER.length]
       currentTrackId = nextId
       currentIndex = TRACK_ORDER.indexOf(nextId)
       playChiptune(TRACKS[nextId], true)
       try { window.dispatchEvent(new CustomEvent('track-toast', { detail: nextId })) } catch {}
-    }, 1700)
+    }, 1450)
   }, 120000)
 }
 
 function stopCurrent() {
+  generation++
   clearTimeout(autoTimeout)
   clearTimeout(fadeTimeout)
-  for (const o of currentOscs) try { o.disconnect(); o.stop?.() } catch {}
+  clearTimeout(nextTimeout)
+  autoTimeout = null; fadeTimeout = null; nextTimeout = null
+  if (intervalId) { clearInterval(intervalId); intervalId = null }
+  for (const o of currentOscs) {
+    try { o.stop?.(); } catch {}
+    try { o.disconnect(); } catch {}
+  }
   currentOscs = []
-  if (workletNode) try { workletNode.disconnect(); workletNode.port?.close?.() } catch {}
-  workletNode = null
-  if (intervalId) clearInterval(intervalId)
-  intervalId = null
-  if (bassOsc) try { bassOsc.stop(); bassOsc.disconnect() } catch {}
-  bassOsc = null
+  if (workletNode) {
+    try { workletNode.disconnect(); } catch {}
+    try { workletNode.port?.close?.(); } catch {}
+    workletNode = null
+  }
+  if (bassOsc) {
+    try { bassOsc.stop(); } catch {}
+    try { bassOsc.disconnect(); } catch {}
+    bassOsc = null
+  }
+  try {
+    const ctx = getContext()
+    gainNode.gain.cancelScheduledValues(ctx.currentTime)
+    gainNode.gain.setValueAtTime(gainNode.gain.value, ctx.currentTime)
+  } catch {}
 }
 
 function playChiptune(track, fromAuto = false) {
   const ctx = getContext()
-  if (ctx.state === 'suspended') ctx.resume()
+  if (ctx.state === 'suspended') ctx.resume().catch(()=>{})
+  // incremento generación antes de parar para invalidar timeouts viejos
+  generation++
+  const myGen = generation
   stopCurrent()
-  // gama baja Android: usa AudioWorklet (hilo de audio, no se corta al caminar)
+  // re-increment after stop (stop already ++, use fresh)
+  generation = myGen + 1
+  const activeGen = generation
+
+  // worklet path — solo Android low preparado
   if (isAndroidLow && workletReady && ctx.audioWorklet) {
     try {
       workletNode = new AudioWorkletNode(ctx, 'chiptune-processor')
       workletNode.connect(gainNode)
       workletNode.port.postMessage({ track, volume: isMuted ? 0 : 0.26 })
       currentOscs.push(workletNode)
+      gainNode.gain.cancelScheduledValues(ctx.currentTime)
       gainNode.gain.setValueAtTime(0, ctx.currentTime)
-      gainNode.gain.linearRampToValueAtTime(isMuted ? 0 : 0.26, ctx.currentTime + 0.6)
+      gainNode.gain.linearRampToValueAtTime(isMuted ? 0 : 0.26, ctx.currentTime + 0.45)
       scheduleAutoNext()
       return
     } catch {}
   }
-  // ensure worklet para próxima vez
   if (isAndroidLow) ensureWorklet(ctx)
-  // fade in suave
-  if (!fromAuto) {
-    gainNode.gain.setValueAtTime(0, ctx.currentTime)
-    gainNode.gain.linearRampToValueAtTime(isMuted ? 0 : 0.34, ctx.currentTime + 1.4)
-  } else {
-    gainNode.gain.setValueAtTime(0, ctx.currentTime)
-    gainNode.gain.linearRampToValueAtTime(isMuted ? 0 : 0.34, ctx.currentTime + 1.2)
-  }
+
+  gainNode.gain.cancelScheduledValues(ctx.currentTime)
+  gainNode.gain.setValueAtTime(0, ctx.currentTime)
+  gainNode.gain.linearRampToValueAtTime(isMuted ? 0 : 0.34, ctx.currentTime + (fromAuto ? 0.9 : 1.0))
   scheduleAutoNext()
+
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
-  // MISMO TICK QUE WEB — igual Ritmo, mismo sonido
   const tick = 60000 / track.bpm / 2
   const tickSec = tick / 1000
   let step = 0
   let bassStep = 0
 
-  // Bajo continuo — en gama baja simplificado a sine sin filtro para no trabar al caminar
+  // bajo continuo
+  const bassGain = ctx.createGain()
+  bassOsc = ctx.createOscillator()
   if (!isAndroidLow) {
-    bassOsc = ctx.createOscillator()
-    const bassGain = ctx.createGain()
     bassOsc.type = 'square'
-    bassGain.gain.value = isMobile ? 0.18 : 0.13
+    bassGain.gain.value = isMobile ? 0.16 : 0.12
     const bassFilter = ctx.createBiquadFilter()
     bassFilter.type = 'lowpass'
     bassFilter.frequency.value = 650
     bassOsc.connect(bassGain); bassGain.connect(bassFilter); bassFilter.connect(gainNode)
     currentOscs.push(bassFilter)
-    bassOsc.start()
-    currentOscs.push(bassOsc, bassGain)
   } else {
-    // low: bajo sine ligero sin filtro (menos CPU, no se traba al caminar)
-    bassOsc = ctx.createOscillator()
-    const bassGain = ctx.createGain()
     bassOsc.type = 'sine'
-    bassGain.gain.value = 0.12
+    bassGain.gain.value = 0.11
     bassOsc.connect(bassGain); bassGain.connect(gainNode)
-    bassOsc.start()
-    currentOscs.push(bassOsc, bassGain)
   }
+  try { bassOsc.start() } catch {}
+  currentOscs.push(bassOsc, bassGain)
 
-  // ===== WEB AUDIO LOOK-AHEAD SCHEDULER =====
-  // En gama baja aumentamos look-ahead para que aunque JS se trabe al caminar, las notas ya estén programadas
-  let nextNoteTime = ctx.currentTime + 0.05
-  const LOOK_AHEAD = isAndroidLow ? 0.4 : (isMobile ? 0.15 : 0.18)
-  const SCHEDULE_INTERVAL = isAndroidLow ? 150 : (isMobile ? 75 : 50)
-  let _stopFlag = false
-
-  stopCurrent = () => {
-    _stopFlag = true
-    clearTimeout(autoTimeout)
-    clearTimeout(fadeTimeout)
-    if (intervalId) { clearInterval(intervalId); intervalId = null }
-    for (const o of currentOscs) try { o.stop(); o.disconnect() } catch {}
-    currentOscs = []
-    if (bassOsc) try { bassOsc.stop(); bassOsc.disconnect() } catch {}
-    bassOsc = null
-  }
+  let nextNoteTime = ctx.currentTime + 0.06
+  const LOOK_AHEAD = 0.22
+  const SCHEDULE_INTERVAL = 55
 
   function scheduleNote(audioTime) {
+    if (activeGen !== generation) return
     const semi = track.melody[step % track.melody.length]
     const freq = track.base * Math.pow(2, semi / 12)
     const osc = ctx.createOscillator()
     const gain = ctx.createGain()
     osc.type = 'square'
     osc.frequency.value = freq
-    const vel = isAndroidLow ? 0.26 : (0.32 + (step % 4 === 0 ? 0.04 : 0))
+    const vel = isAndroidLow ? 0.24 : (0.30 + (step % 4 === 0 ? 0.04 : 0))
     gain.gain.setValueAtTime(0, audioTime)
-    gain.gain.linearRampToValueAtTime(vel, audioTime + 0.008)
-    gain.gain.exponentialRampToValueAtTime(0.02, audioTime + tickSec * 0.85)
+    gain.gain.linearRampToValueAtTime(vel, audioTime + 0.006)
+    gain.gain.exponentialRampToValueAtTime(0.015, audioTime + tickSec * 0.86)
     if (isAndroidLow) {
-      // low: sin filtro (ahorra Biquad por nota = no se traba al caminar)
       osc.connect(gain); gain.connect(gainNode)
     } else {
       const filt = ctx.createBiquadFilter()
       filt.type = 'lowpass'
-      filt.frequency.value = track.mood === 'Noche' || track.mood === 'Tristeza' ? 1800 : 2600 + (step % 8 === 0 ? 400 : 0)
+      filt.frequency.value = track.mood === 'Noche' || track.mood === 'Tristeza' ? 1750 : 2500
       osc.connect(gain); gain.connect(filt); filt.connect(gainNode)
-      currentOscs.push(filt)
+      // no guardar filt para no leak — se auto desconecta al stop
+      setTimeout(() => { try { filt.disconnect() } catch {} }, (tickSec+0.2)*1000)
     }
-    osc.start(audioTime)
-    osc.stop(audioTime + tickSec + 0.01)
-    currentOscs.push(osc, gain)
-    // Cleanup — más agresivo en low para no acumular nodos al caminar
-    while (currentOscs.length > (isAndroidLow ? 18 : 30)) {
-      const old = currentOscs.shift()
-      try { old.disconnect() } catch {}
-    }
+    try { osc.start(audioTime); osc.stop(audioTime + tickSec + 0.02) } catch {}
+    // auto-limpieza tras sonar
+    setTimeout(() => { try { osc.disconnect(); gain.disconnect() } catch {} }, (tickSec+0.3)*1000)
 
-    // Ritmo adicional — solo desktop
-    if (!isMobile && !isLowEnd) {
-      const trackKey = Object.keys(TRACKS).find(k => TRACKS[k] === track)
-      const isTechno = ['techno', 'house', 'trance', 'hardcore', 'ambient_techno', 'electro'].includes(trackKey)
-      const isCalm = ['calma', 'noche', 'serenidad', 'paz'].includes(trackKey)
-      if (isTechno && step % 2 === 0) {
-        const kOsc = ctx.createOscillator(); const kGain = ctx.createGain()
-        kOsc.type = 'sine'; kOsc.frequency.setValueAtTime(55, audioTime); kOsc.frequency.exponentialRampToValueAtTime(30, audioTime + 0.12)
-        kGain.gain.setValueAtTime(0, audioTime); kGain.gain.linearRampToValueAtTime(0.18, audioTime + 0.005); kGain.gain.exponentialRampToValueAtTime(0.01, audioTime + 0.14)
-        kOsc.connect(kGain); kGain.connect(gainNode); kOsc.start(audioTime); kOsc.stop(audioTime + 0.14)
-        currentOscs.push(kOsc, kGain)
-        const hGain = ctx.createGain(); const hFilt = ctx.createBiquadFilter()
-        hFilt.type = 'highpass'; hFilt.frequency.value = 7500
-        hGain.gain.setValueAtTime(0, audioTime); hGain.gain.linearRampToValueAtTime(0.08, audioTime + 0.002); hGain.gain.exponentialRampToValueAtTime(0.001, audioTime + 0.05)
-        const hOsc = ctx.createOscillator(); hOsc.type = 'square'; hOsc.frequency.value = 2200 + Math.random() * 400
-        hOsc.connect(hGain); hGain.connect(hFilt); hFilt.connect(gainNode); hOsc.start(audioTime); hOsc.stop(audioTime + 0.05)
-        currentOscs.push(hOsc, hGain, hFilt)
-      } else if (!isCalm && step % 2 === 1) {
-        const hGain = ctx.createGain(); const hFilt = ctx.createBiquadFilter()
-        hFilt.type = 'highpass'; hFilt.frequency.value = 7000
-        hGain.gain.setValueAtTime(0, audioTime); hGain.gain.linearRampToValueAtTime(0.05, audioTime + 0.003); hGain.gain.exponentialRampToValueAtTime(0.001, audioTime + 0.05)
-        const hOsc = ctx.createOscillator(); hOsc.type = 'square'; hOsc.frequency.value = 1800 + Math.random() * 400
-        hOsc.connect(hGain); hGain.connect(hFilt); hFilt.connect(gainNode); hOsc.start(audioTime); hOsc.stop(audioTime + 0.05)
-        currentOscs.push(hOsc, hGain, hFilt)
-      }
-    }
-
-    // Bajo cambia cada 2 pasos
-    if (step % 2 === 0) {
+    if (step % 2 === 0 && bassOsc) {
       const bSemi = track.bass[bassStep % track.bass.length]
       const bFreq = (track.base * 0.5) * Math.pow(2, bSemi / 12)
-      bassOsc.frequency.setValueAtTime(bFreq, audioTime)
+      try { bassOsc.frequency.setValueAtTime(bFreq, audioTime) } catch {}
       bassStep++
     }
     step++
   }
 
   function scheduler() {
-    if (_stopFlag) return
-    while (nextNoteTime < ctx.currentTime + LOOK_AHEAD) {
+    if (activeGen !== generation) { clearInterval(intervalId); intervalId = null; return }
+    // si pestaña oculta, no saturar pero mantener tiempo (ya programado con look-ahead)
+    if (document.visibilityState === 'hidden') return
+    const now = ctx.currentTime
+    while (nextNoteTime < now + LOOK_AHEAD) {
       scheduleNote(nextNoteTime)
       nextNoteTime += tickSec
     }
   }
   intervalId = setInterval(scheduler, SCHEDULE_INTERVAL)
+  // primer pump inmediato
+  scheduler()
 }
 
 export function createMusicManager() {
@@ -314,10 +291,15 @@ export function createMusicManager() {
     init() { getContext() },
     setVolume(v) {
       const ctx = getContext()
-      gainNode.gain.linearRampToValueAtTime(Math.max(0, Math.min(1, v)), ctx.currentTime + 0.08)
+      if (isMuted) return
+      try {
+        gainNode.gain.cancelScheduledValues(ctx.currentTime)
+        gainNode.gain.setValueAtTime(gainNode.gain.value, ctx.currentTime)
+        gainNode.gain.linearRampToValueAtTime(Math.max(0, Math.min(1, v)), ctx.currentTime + 0.06)
+      } catch {}
     },
-    mute() { isMuted = true; this.setVolume(0) },
-    unmute(vol = 0.34) { isMuted = false; this.setVolume(vol) },
+    mute() { isMuted = true; try { this.setVolume(0); fadeTo(0, 0.25) } catch {} },
+    unmute(vol = 0.34) { isMuted = false; const ctx = getContext(); try { gainNode.gain.cancelScheduledValues(ctx.currentTime); gainNode.gain.setValueAtTime(0, ctx.currentTime); gainNode.gain.linearRampToValueAtTime(Math.max(0, Math.min(1, vol)), ctx.currentTime + 0.25) } catch {} },
     toggleMute() { if (isMuted) this.unmute(); else this.mute() },
     play(trackId = 'calma', fromAuto = false) {
       if (!TRACKS[trackId]) trackId = 'calma'
@@ -327,29 +309,38 @@ export function createMusicManager() {
       try { window.dispatchEvent(new CustomEvent('track-toast', { detail: trackId })) } catch {}
     },
     next() {
-      // desvanecimiento antes de siguiente manual
-      fadeTo(0, 0.9)
-      clearTimeout(autoTimeout)
-      setTimeout(() => {
+      clearTimeout(nextTimeout); clearTimeout(autoTimeout); clearTimeout(fadeTimeout)
+      fadeTo(0, 0.65)
+      const myGen = generation
+      nextTimeout = setTimeout(() => {
+        if (myGen !== generation && generation !== myGen + 1) {
+          // si hubo otro cambio entremedio, ignora
+        }
         currentIndex = (currentIndex + 1) % TRACK_ORDER.length
-        this.play(TRACK_ORDER[currentIndex], true)
-      }, 950)
+        const nid = TRACK_ORDER[currentIndex]
+        currentTrackId = nid
+        playChiptune(TRACKS[nid], true)
+        try { window.dispatchEvent(new CustomEvent('track-toast', { detail: nid })) } catch {}
+      }, 680)
       return TRACK_ORDER[(currentIndex + 1) % TRACK_ORDER.length]
     },
     prev() {
-      fadeTo(0, 0.9)
-      clearTimeout(autoTimeout)
-      setTimeout(() => {
+      clearTimeout(nextTimeout); clearTimeout(autoTimeout); clearTimeout(fadeTimeout)
+      fadeTo(0, 0.65)
+      nextTimeout = setTimeout(() => {
         currentIndex = (currentIndex - 1 + TRACK_ORDER.length) % TRACK_ORDER.length
-        this.play(TRACK_ORDER[currentIndex], true)
-      }, 950)
+        const nid = TRACK_ORDER[currentIndex]
+        currentTrackId = nid
+        playChiptune(TRACKS[nid], true)
+        try { window.dispatchEvent(new CustomEvent('track-toast', { detail: nid })) } catch {}
+      }, 680)
       return TRACK_ORDER[currentIndex]
     },
     random() {
       const rnd = TRACK_ORDER[Math.floor(Math.random() * TRACK_ORDER.length)]
       this.play(rnd); return rnd
     },
-    stop() { stopCurrent() },
+    stop() { stopCurrent(); fadeTo(0, 0.3) },
     getTracks() { return TRACKS }
   }
 }

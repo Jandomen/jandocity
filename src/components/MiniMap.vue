@@ -2,14 +2,20 @@
 import { ref, onMounted, watch, computed } from 'vue'
 import { useCityStore } from '@/stores/cityStore.js'
 import { useSinglePlayerStore } from '@/stores/singlePlayerStore.js'
+import { useCamera } from '@/composables/useCamera.js'
+import { usePlayerStore } from '@/stores/playerStore.js'
 import { WEAPONS } from '@/config/weapons.js'
 
 const props = defineProps({ show: Boolean, targeting: Boolean })
 const emit = defineEmits(['close','strike','cancelTargeting'])
 const city = useCityStore()
 const single = useSinglePlayerStore()
+const camera = useCamera()
+const player = usePlayerStore()
 const canvasRef = ref(null)
 const hoverPos = ref(null)
+const sliderX = ref(50)
+const sliderY = ref(50)
 const pendingWeapon = computed(() => city.pendingRemoteWeapon || null)
 const isTargeting = computed(() => props.targeting || !!pendingWeapon.value)
 const weaponInfo = computed(() => WEAPONS.find(w => w.id === pendingWeapon.value) || null)
@@ -85,6 +91,30 @@ function draw() {
     ctx.fillStyle = '#ef4444'
     ctx.fillRect(gx, gy, 1, 1)
   }
+  // viewport rect + player dot (solo en pausa, no en targeting)
+  if (!isTargeting.value) {
+    try {
+      const s = camera.scale.value
+      const vw = window.innerWidth, vh = window.innerHeight
+      const ox = city.offsetX ?? 0
+      const oy = city.offsetY ?? 0
+      const left = (-camera.x.value)/s/48 + ox
+      const top = (-camera.y.value)/s/48 + oy
+      const vwGrid = vw / s / 48
+      const vhGrid = vh / s / 48
+      const cx = (left - ox)
+      const cy = (top - oy)
+      ctx.strokeStyle = '#facc15'
+      ctx.lineWidth = 0.7
+      ctx.strokeRect(cx, cy, vwGrid, vhGrid)
+      const px = player.x - ox
+      const py = player.y - oy
+      if (px>=0 && px<w && py>=0 && py<h) {
+        ctx.fillStyle = '#ef4444'
+        ctx.fillRect(px-1, py-1, 2, 2)
+      }
+    } catch {}
+  }
 }
 
 function canvasToAxAy(e) {
@@ -134,10 +164,45 @@ function handleClose() {
   emit('close')
 }
 
-onMounted(draw)
+function onSliderX(e) {
+  const v = parseInt(e.target.value)
+  sliderX.value = v
+  const s = camera.scale.value
+  const ox = city.offsetX ?? 0
+  const size = city.grid.length
+  const targetX = ox + (v/100)*(size-1)
+  const localX = (targetX - ox) * 48 + 24
+  camera.x.value = window.innerWidth/2 - localX * s
+  draw()
+}
+function onSliderY(e) {
+  const v = parseInt(e.target.value)
+  sliderY.value = v
+  const s = camera.scale.value
+  const oy = city.offsetY ?? 0
+  const size = city.grid.length
+  const targetY = oy + (v/100)*(size-1)
+  const localY = (targetY - oy) * 48 + 24
+  camera.y.value = window.innerHeight/2 - localY * s
+  draw()
+}
+function centerOnPlayer() {
+  const ox = city.offsetX ?? 0, oy = city.offsetY ?? 0
+  const s = camera.scale.value
+  camera.x.value = window.innerWidth/2 - ((player.x-ox)*48+24)*s
+  camera.y.value = window.innerHeight/2 - ((player.y-oy)*48+24)*s
+  // update sliders to reflect
+  const size = city.grid.length
+  sliderX.value = Math.round(((player.x - ox)/(size-1))*100)
+  sliderY.value = Math.round(((player.y - oy)/(size-1))*100)
+  draw()
+}
+
+onMounted(() => { draw(); setInterval(draw, 600) })
 watch(() => [city.grid, city.grid.length, props.show, hoverPos.value, pendingWeapon.value], draw)
 watch(() => city.tickCount, draw)
 watch(() => pendingWeapon.value, draw)
+watch(() => [camera.x.value, camera.y.value, player.x, player.y], draw)
 </script>
 
 <template>
@@ -155,8 +220,34 @@ watch(() => pendingWeapon.value, draw)
         <span class="animate-pulse">●</span>
         <span>Selecciona en el mapa dónde caerá el ataque. El suelo quedará <b class="text-white">gris con escombros</b> hasta que vuelva el pasto (12s → tierra, 37s → pasto).</span>
       </div>
-      <div class="flex-1 overflow-auto p-3 flex items-center justify-center bg-[#0f172a]">
+      <div class="flex-1 overflow-auto p-3 flex items-center justify-center bg-[#0f172a] gap-2">
         <canvas ref="canvasRef" @click="handleCanvasClick" @mousemove="handleCanvasMove" @mouseleave="hoverPos=null; draw()" class="max-w-[90vw] max-h-[75vh] md:max-w-full md:max-h-[60vh] w-auto h-auto border border-white/10 rounded shadow" :class="isTargeting ? 'cursor-crosshair ring-2 ring-red-500' : 'cursor-default'" style="image-rendering: pixelated; width: min(85vw, 400px); height: min(85vw, 400px);"></canvas>
+        <!-- Deslizador vertical/horizontal solo en pausa (no targeting) — toca para navegar el perímetro -->
+        <div v-if="!isTargeting" class="hidden md:flex flex-col items-center gap-1 bg-black/40 border border-white/10 rounded-full p-1.5">
+          <span class="text-[7px] text-white/40 font-black">↑ N</span>
+          <input type="range" orient="vertical" min="0" max="100" :value="sliderY" @input="onSliderY" class="w-6 h-[220px] accent-white" style="writing-mode: bt-lr; -webkit-appearance: slider-vertical;" />
+          <span class="text-[7px] text-white/40 font-black">S ↓</span>
+        </div>
+      </div>
+      <!-- Sliders móviles / pausa — horizontales + centrar -->
+      <div v-if="!isTargeting" class="shrink-0 px-3 py-2 bg-black/30 border-t border-white/10 flex flex-col gap-1.5 md:hidden">
+        <div class="flex items-center gap-2">
+          <span class="text-[8px] text-white/50 font-black">◀ O</span>
+          <input type="range" min="0" max="100" :value="sliderX" @input="onSliderX" class="flex-1 accent-white h-1" />
+          <span class="text-[8px] text-white/50 font-black">E ▶</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-[8px] text-white/50 font-black">↑ N</span>
+          <input type="range" min="0" max="100" :value="sliderY" @input="onSliderY" class="flex-1 accent-white h-1" />
+          <span class="text-[8px] text-white/50 font-black">S ↓</span>
+        </div>
+        <button @click="centerOnPlayer" class="py-1.5 rounded-full bg-white/10 border border-white/15 text-white text-[10px] font-bold">⌖ Centrar en ti (rojo)</button>
+      </div>
+      <div v-if="!isTargeting" class="hidden md:flex shrink-0 px-3 py-1.5 bg-black/30 border-t border-white/10 items-center gap-2">
+        <span class="text-[8px] text-white/50 font-black">◀ O</span>
+        <input type="range" min="0" max="100" :value="sliderX" @input="onSliderX" class="flex-1 accent-white h-1" />
+        <span class="text-[8px] text-white/50 font-black">E ▶</span>
+        <button @click="centerOnPlayer" class="px-3 py-1 rounded-full bg-white/10 border border-white/15 text-white text-[10px] font-bold whitespace-nowrap">⌖ Centrar</button>
       </div>
       <div class="shrink-0 p-3 border-t border-white/10 bg-slate-800/40 flex flex-col gap-2">
         <div v-if="hoverPos && isTargeting" class="text-center text-[11px] font-mono text-white/70">

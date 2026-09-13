@@ -5,7 +5,8 @@ const stored = (() => {
   try { return localStorage.getItem('jandocity-quality') } catch { return null }
 })()
 
-const quality = ref(stored || 'auto')
+// Forzar gama alta por defecto (usuario pidió juego muy rápido)
+const quality = ref(stored || 'high')
 const effectiveQuality = computed(() => quality.value === 'auto' ? detectQuality() : quality.value)
 const preset = computed(() => PERFORMANCE_PRESETS[effectiveQuality.value] || PERFORMANCE_PRESETS.medium)
 

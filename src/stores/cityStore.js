@@ -657,6 +657,10 @@ export const useCityStore = defineStore('city', () => {
     if (isAtomic) {
       try { (globalThis||window).dispatchEvent(new CustomEvent('atomic-alarm', { detail: { weaponId, x: targetX, y: targetY, heavy: isHeavy } })) } catch {}
     }
+    const startX = targetX - radius
+    const endX = targetX + radius
+    const startY = targetY - radius
+    const endY = targetY + radius
     for (let y = startY; y <= endY; y++) {
       for (let x = startX; x <= endX; x++) {
         const cell = getCell(x, y)

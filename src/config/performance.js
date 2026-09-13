@@ -1,15 +1,15 @@
 export const PERFORMANCE_PRESETS = {
   high: {
-    label: 'Alto',
-    maxPedestrians: 40,
-    maxVehicles: 30,
-    maxAccidents: 3,
-    maxPlanes: 4,
-    trafficTickMs: 600,
-    serviceSpawnMs: 10000,
-    buildTickMs: 120,
-    selectionTickMs: 450,
-    visibleOverscan: 2,
+    label: 'Gama alta ⚡',
+    maxPedestrians: 55,
+    maxVehicles: 40,
+    maxAccidents: 4,
+    maxPlanes: 5,
+    trafficTickMs: 320,
+    serviceSpawnMs: 6500,
+    buildTickMs: 65,
+    selectionTickMs: 220,
+    visibleOverscan: 3,
     terrainNoise: true,
     shadows: true,
     blur: true,
@@ -17,69 +17,60 @@ export const PERFORMANCE_PRESETS = {
     simpleEntities: false,
     maxVisibleEntities: 999,
     decor: true,
-    particleLimit: 20,
+    particleLimit: 28,
   },
   medium: {
     label: 'Medio',
-    maxPedestrians: 20,
-    maxVehicles: 16,
+    maxPedestrians: 28,
+    maxVehicles: 22,
     maxAccidents: 2,
-    maxPlanes: 2,
-    trafficTickMs: 800,
-    serviceSpawnMs: 13000,
-    buildTickMs: 180,
-    selectionTickMs: 600,
-    visibleOverscan: 1,
+    maxPlanes: 3,
+    trafficTickMs: 520,
+    serviceSpawnMs: 9000,
+    buildTickMs: 110,
+    selectionTickMs: 380,
+    visibleOverscan: 2,
     terrainNoise: true,
     shadows: false,
     blur: false,
     animations: true,
     simpleEntities: false,
-    maxVisibleEntities: 50,
+    maxVisibleEntities: 120,
     decor: true,
-    particleLimit: 12,
+    particleLimit: 16,
   },
   low: {
     label: 'Ahorro',
-    maxPedestrians: 4,
-    maxVehicles: 3,
-    maxAccidents: 0,
-    maxPlanes: 0,
-    trafficTickMs: 2000,
-    serviceSpawnMs: 26000,
-    buildTickMs: 500,
-    selectionTickMs: 1200,
-    visibleOverscan: 0,
+    maxPedestrians: 8,
+    maxVehicles: 6,
+    maxAccidents: 1,
+    maxPlanes: 1,
+    trafficTickMs: 900,
+    serviceSpawnMs: 14000,
+    buildTickMs: 220,
+    selectionTickMs: 600,
+    visibleOverscan: 1,
     terrainNoise: false,
     shadows: false,
     blur: false,
-    animations: false,
+    animations: true,
     simpleEntities: true,
-    maxVisibleEntities: 12,
+    maxVisibleEntities: 40,
     decor: false,
-    particleLimit: 0,
+    particleLimit: 8,
   },
 }
 
 export function detectQuality() {
+  // Usuario pidió juego muy rápido como gama alta: forzamos high por defecto
+  // Solo respeta Ahorro si el usuario lo eligió manualmente o saveData extremo
   if (typeof navigator === 'undefined' || typeof window === 'undefined') return 'high'
-  const ua = navigator.userAgent || ''
-  const isAndroid = /Android/i.test(ua)
-  const isIOS = /iPhone|iPad|iPod/i.test(ua)
-  const isMobile = isAndroid || isIOS || window.innerWidth < 768
-  const mem = navigator.deviceMemory || 4
-  const cores = navigator.hardwareConcurrency || 4
-  const conn = navigator.connection?.effectiveType || '4g'
+  try {
+    const stored = localStorage.getItem('jandocity-quality')
+    if (stored === 'low' || stored === 'medium' || stored === 'high') return stored === 'auto' ? 'high' : stored
+    if (stored === 'high') return 'high'
+  } catch {}
   const saveData = navigator.connection?.saveData || false
-  if (saveData) return 'low'
-  if (!isMobile) return 'high'
-  // Android gama baja: muy agresivo — la mayoría de gama baja tiene 2-3GB y 4 cores
-  if (isAndroid) {
-    if (mem <= 3 || cores <= 4 || conn === '2g' || conn === 'slow-2g' || conn === '3g') return 'low'
-    if (mem <= 4 || cores <= 6) return 'medium'
-    return 'medium'
-  }
-  if (mem <= 2 || cores <= 2 || conn === '2g' || conn === 'slow-2g') return 'low'
-  if (mem <= 3 || cores <= 4) return 'medium'
-  return 'medium'
+  if (saveData) return 'medium'
+  return 'high'
 }

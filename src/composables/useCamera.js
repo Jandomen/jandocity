@@ -85,7 +85,7 @@ export function useCamera() {
   }
 
   function onKeydown(e) {
-    const step = e.shiftKey ? 40 : 20
+    const step = e.shiftKey ? 64 : 34
     switch (e.key.toLowerCase()) {
       case 'w':
       case 'arrowup': y.value += step; break

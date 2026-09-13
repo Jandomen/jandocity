@@ -13,12 +13,13 @@ let timer = null
 function start(e) {
   active.value = true
   move(e)
+  // 65ms = ~15 pasos/s = sensación gama alta ultra rápida (antes 140ms ~7 pasos/s)
   timer = setInterval(() => {
     if (!active.value) return
-    const adx = Math.abs(dx.value) > 0.35 ? Math.sign(dx.value) : 0
-    const ady = Math.abs(dy.value) > 0.35 ? Math.sign(dy.value) : 0
+    const adx = Math.abs(dx.value) > 0.28 ? Math.sign(dx.value) : 0
+    const ady = Math.abs(dy.value) > 0.28 ? Math.sign(dy.value) : 0
     if (adx !== 0 || ady !== 0) player.move(adx, ady, city.grid)
-  }, 140)
+  }, 62)
 }
 
 function move(e) {

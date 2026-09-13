@@ -36,7 +36,7 @@ export const usePlayerStore = defineStore('player', () => {
     else if (dy === -1) dir.value = 'up'
     else if (dy === 1) dir.value = 'down'
     isMoving.value = true
-    setTimeout(() => isMoving.value = false, 140)
+    setTimeout(() => isMoving.value = false, 70)
     // Revela niebla al pisar (expansión ahora manual con I)
     try {
       const city = useCityStore()
