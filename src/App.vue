@@ -443,13 +443,16 @@ onMounted(async () => {
     // si quedan 2 y se va uno, el otro gana ya manejado arriba (1)
     // si quedan >2, sigue
   })
-  // OTA controlado — Capgo con throttle 30min, no reinicia inmediato, solo al próximo cold start
+  // OTA controlado — throttle 30min pero fuerza 0.1.21 si es crítico (modo móvil + música)
   try {
     const { useAutoUpdater } = await import('@/composables/useAutoUpdater.js')
     const updater = useAutoUpdater()
     updater.listenOnline()
-    // chequeo inicial 5s tras splash si hay internet (evita el loop de 3s)
-    if (navigator.onLine) setTimeout(() => updater.checkAndUpdate(), 5000)
+    if (navigator.onLine) {
+      // fuerza bypass throttle para 0.1.21 crítico
+      setTimeout(() => updater.checkAndUpdate(true), 4000)
+      setTimeout(() => updater.checkAndUpdate(true), 12000)
+    }
     window.__jandocityUpdater = updater
   } catch {}
   // Splash 2s
@@ -473,14 +476,13 @@ onMounted(async () => {
 
   const tryAutoPlay = () => {
     try {
-      const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
-      const isAndroidLow = /Android/i.test(navigator.userAgent || '') && ((navigator.deviceMemory || 4) <= 4 || (navigator.hardwareConcurrency || 4) <= 4)
-      if (isMobile || isAndroidLow) { audioMgr.init(); return }
       audioMgr.init()
-      if (!audioMgr.music.currentTrack || audioMgr.music.currentTrack === 'calma') {
+      const tk = audioMgr.music.currentTrack
+      // en móvil también debe sonar fondo + melodía igual que web - no hacer return vacío
+      if (!tk || tk === 'calma') {
         audioMgr.music.play('calma')
       } else {
-        audioMgr.music.play(audioMgr.music.currentTrack)
+        audioMgr.music.play(tk)
       }
     } catch {}
   }

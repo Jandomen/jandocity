@@ -146,10 +146,10 @@ const visibleRange = computed(() => {
 
 const visibleRows = computed(() => {
   const { startX, endX, startY, endY } = visibleRange.value
-  // low: clamp más agresivo para menos DOM (máx 15x10 celdas visibles)
+  // low: clamp ultra agresivo para gama baja (12x8 = 96 celdas vs 192)
   let sx = startX, ex = endX, sy = startY, ey = endY
   if (isLow.value) {
-    const maxW = 16, maxH = 12
+    const maxW = 12, maxH = 8
     if (ex - sx > maxW) { const cx = (sx+ex)/2; sx = Math.max(0, Math.floor(cx - maxW/2)); ex = Math.min(gridWidth.value, sx+maxW) }
     if (ey - sy > maxH) { const cy = (sy+ey)/2; sy = Math.max(0, Math.floor(cy - maxH/2)); ey = Math.min(gridHeight.value, sy+maxH) }
   }
