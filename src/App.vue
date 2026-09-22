@@ -44,6 +44,7 @@ import { usePerformance } from '@/composables/usePerformance.js'
 import { Capacitor } from '@capacitor/core'
 import UpdatePrompt from '@/components/UpdatePrompt.vue'
 import DesktopUpdatePrompt from '@/components/DesktopUpdatePrompt.vue'
+import Downloads from '@/components/Downloads.vue'
 
 const city = useCityStore()
 const player = usePlayerStore()
@@ -263,6 +264,8 @@ function handleMenuSelect(mode) {
       if (!data.session) { showAuth.value = true; pendingMulti.value = true; return }
       appState.value = 'multiLobby'
     })
+  } else if (mode === 'downloads') {
+    appState.value = 'downloads'
   }
 }
 function handleCharacterSelect(id) {
@@ -545,6 +548,8 @@ onUnmounted(() => {
 
     <!-- Menú principal -->
     <MainMenu v-else-if="appState==='menu'" @select="handleMenuSelect" />
+    <!-- Descargas con logos oficiales + contador -->
+    <Downloads v-else-if="appState==='downloads'" @back="appState='menu'" />
 
     <!-- Loading genérico (Cargando... / Entrando al servidor...) — funciona web y móvil/APK -->
     <LoadingScreen v-else-if="appState==='loading'" :text="loadingText" :subtext="loadingSub" />

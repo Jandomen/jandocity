@@ -1,6 +1,10 @@
 <script setup>
 import { Capacitor } from '@capacitor/core'
+import { onMounted } from 'vue'
+import { useDownloads } from '@/composables/useDownloads.js'
 const emit = defineEmits(['select'])
+const { total, fetchCounts } = useDownloads()
+onMounted(() => fetchCounts())
 async function exitApp() {
   try {
     if (Capacitor.isNativePlatform()) {
@@ -64,32 +68,21 @@ const isWeb = (() => !isNative && !isElectron)()
         </button>
       </div>
 
-      <!-- Descargas — solo en web (oculto en Android APK y en Electron .exe) -->
-      <a v-if="isWeb" href="/Jandocity.apk" download="Jandocity.apk" class="group w-full flex items-center gap-3 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 active:translate-y-[2px] text-slate-900 rounded-xl px-4 py-3.5 shadow-[0_6px_0_#92400e,0_8px_16px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.35)] border-2 border-white/30 transition-all">
-        <span class="w-11 h-11 rounded-lg bg-white/90 border-2 border-white flex items-center justify-center text-xl shadow-inner">📲</span>
+      <!-- Descargas — página aparte con logos oficiales + contador -->
+      <button v-if="isWeb" @click="emit('select','downloads')" class="group w-full flex items-center gap-3 bg-[#0f172a] hover:bg-[#1e293b] active:translate-y-[2px] text-white rounded-xl px-4 py-3.5 shadow-[0_6px_0_#020617,0_8px_16px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.08)] border-2 border-[#334155] transition-all">
+        <span class="w-11 h-11 rounded-lg bg-gradient-to-br from-emerald-500 via-sky-500 to-orange-500 flex items-center justify-center text-lg shadow-inner border-2 border-white/20">⬇️</span>
         <div class="text-left flex-1">
-          <div class="font-black text-sm tracking-wide leading-none">DESCARGAR PARA ANDROID</div>
-          <div class="text-[11px] text-slate-900/70 leading-none font-bold mt-1">APK directa • 7.0 MB • v0.1.40</div>
+          <div class="font-black text-sm tracking-wide flex items-center gap-2">DESCARGAS <span class="text-[10px] bg-white text-slate-900 px-2 py-0.5 rounded-full font-black">{{ total.toLocaleString('es') }} total</span></div>
+          <div class="text-[11px] text-white/60 leading-none flex items-center gap-1.5 mt-1">
+            <!-- mini logos oficiales -->
+            <span class="w-4 h-4 rounded bg-white flex items-center justify-center"><svg viewBox="0 0 24 24" class="w-3 h-3" fill="#3DDC84"><path d="M6 18c0 .55.45 1 1 1h1v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h2v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h1c.55 0 1-.45 1-1V8H6v10z"/></svg></span>
+            <span class="w-4 h-4 rounded bg-white flex items-center justify-center"><svg viewBox="0 0 24 24" class="w-3 h-3"><path fill="#00A4EF" d="M3 3.5h8v8H3z"/><path fill="#FFB900" d="M13 3.5h8v8h-8z"/><path fill="#7FBA00" d="M3 13.5h8v8H3z"/><path fill="#F25022" d="M13 13.5h8v8h-8z"/></svg></span>
+            <span class="w-4 h-4 rounded bg-white flex items-center justify-center"><svg viewBox="0 0 24 24" class="w-3 h-3"><ellipse cx="12" cy="14.5" rx="7" ry="6.5" fill="#000"/><ellipse cx="12" cy="14.2" rx="6.2" ry="5.8" fill="#fff"/></svg></span>
+            Android • Windows • Linux • offline
+          </div>
         </div>
-        <span class="w-7 h-7 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-xs group-active:scale-95">⬇</span>
-      </a>
-      <a v-if="isWeb" href="/Jandocity-Portable-0.1.40.exe" download="Jandocity-Portable-0.1.40.exe" class="group w-full flex items-center gap-3 bg-gradient-to-r from-sky-400 to-indigo-500 hover:from-sky-300 hover:to-indigo-400 active:translate-y-[2px] text-white rounded-xl px-4 py-3.5 shadow-[0_6px_0_#1e1b4b,0_8px_16px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.25)] border-2 border-white/30 transition-all">
-        <span class="w-11 h-11 rounded-lg bg-white/90 border-2 border-white flex items-center justify-center text-xl shadow-inner">🪟</span>
-        <div class="text-left flex-1">
-          <div class="font-black text-sm tracking-wide leading-none" style="text-shadow:0 1px 0 #1e1b4b">DESCARGAR PARA WINDOWS</div>
-          <div class="text-[11px] text-white/80 leading-none font-bold mt-1">.EXE portable • sin instalar • offline</div>
-        </div>
-        <span class="w-7 h-7 rounded-full bg-white text-[#1e3a8a] flex items-center justify-center font-black text-xs group-active:scale-95">⬇</span>
-      </a>
-      <a v-if="isWeb" href="/Jandocity-0.1.40.deb" download="Jandocity-0.1.40.deb" class="group w-full flex items-center gap-3 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-400 hover:to-amber-500 active:translate-y-[2px] text-white rounded-xl px-4 py-3.5 shadow-[0_6px_0_#7c2d12,0_8px_16px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.25)] border-2 border-white/30 transition-all">
-        <span class="w-11 h-11 rounded-lg bg-white/90 border-2 border-white flex items-center justify-center text-xl shadow-inner">🐧</span>
-        <div class="text-left flex-1">
-          <div class="font-black text-sm tracking-wide leading-none" style="text-shadow:0 1px 0 #7c2d12">DESCARGAR PARA LINUX</div>
-          <div class="text-[11px] text-white/80 leading-none font-bold mt-1">.DEB (Ubuntu/Debian) • 86 MB • offline</div>
-        </div>
-        <span class="w-7 h-7 rounded-full bg-white text-[#9a3412] flex items-center justify-center font-black text-xs group-active:scale-95">⬇</span>
-      </a>
-      <p v-if="isWeb" class="text-[10px] text-white/30 text-center -mt-2 font-mono">Linux: sudo dpkg -i .deb • AppImage 123MB por límite GitHub → usa .deb</p>
+        <span class="w-7 h-7 rounded-full bg-white text-slate-900 flex items-center justify-center font-black text-sm group-active:scale-95">›</span>
+      </button>
 
       <button @click="exitApp" class="w-full mt-2 flex items-center justify-center gap-2 bg-black/40 hover:bg-black/60 text-white/70 hover:text-white rounded-xl px-4 py-3 border border-white/10 text-xs font-bold tracking-widest">⏻ SALIR DEL JUEGO</button>
 
