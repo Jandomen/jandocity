@@ -78,6 +78,16 @@ android/app/debug/
 *.jks
 !public/*.apk
 
+# Electron / Desktop — permite public/*.exe para descarga web
+release/
+out/
+*.exe
+!public/*.exe
+*.msi
+*.dmg
+*.AppImage
+*.blockmap
+
 # iOS (futuro)
 ios/App/build/
 ios/App/public/

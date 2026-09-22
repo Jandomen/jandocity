@@ -3,10 +3,16 @@
   "version": "0.1.40",
   "private": true,
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "electron:dev": "vite --host 0.0.0.0 & VITE_DEV_SERVER_URL=http://localhost:5173 electron .",
+    "electron": "electron .",
+    "build:win": "vite build && electron-builder --win --x64",
+    "build:win-portable": "vite build && electron-builder --win portable --x64",
+    "dist:win": "electron-builder --win --x64"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.1",
@@ -21,9 +27,58 @@
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.1.3",
     "autoprefixer": "^10.4.20",
+    "electron": "^31.7.7",
+    "electron-builder": "^25.1.8",
+    "electron-updater": "^6.8.9",
     "postcss": "^8.4.41",
     "tailwindcss": "^3.4.10",
     "vite": "^5.4.8",
     "vite-plugin-pwa": "^1.3.0"
+  },
+  "build": {
+    "appId": "com.jandocity.app",
+    "productName": "Jandocity",
+    "copyright": "© 2026 JANDOSOFT",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "main": "electron/main.cjs"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "public/favicon.png",
+      "artifactName": "Jandocity-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Jandocity"
+    },
+    "portable": {
+      "artifactName": "Jandocity-Portable-${version}.exe"
+    },
+    "publish": null
   }
 }

@@ -1,0 +1,4 @@
+JANDOCITY PORTABLE PLACEHOLDER
+Version 0.1.40
+Build Windows con: npm run build:win
+Este archivo sera reemplazado por el .exe real de Electron.

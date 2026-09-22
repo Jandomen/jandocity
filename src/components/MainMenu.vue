@@ -14,6 +14,8 @@ async function exitApp() {
   } catch { try { window.close() } catch {} }
 }
 const isNative = (() => { try { return Capacitor.isNativePlatform() } catch { return /Android/i.test(navigator.userAgent||'') } })()
+const isElectron = (() => { try { return !!window.__JANDOCITY_ELECTRON__?.isElectron } catch { return false } })()
+const isWeb = (() => !isNative && !isElectron)()
 </script>
 
 <template>
@@ -62,8 +64,8 @@ const isNative = (() => { try { return Capacitor.isNativePlatform() } catch { re
         </button>
       </div>
 
-      <!-- Descarga directa APK — solo en web (oculto en Android nativo) -->
-      <a v-if="!isNative" href="/Jandocity.apk" download="Jandocity.apk" class="group w-full flex items-center gap-3 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 active:translate-y-[2px] text-slate-900 rounded-xl px-4 py-3.5 shadow-[0_6px_0_#92400e,0_8px_16px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.35)] border-2 border-white/30 transition-all">
+      <!-- Descargas — solo en web (oculto en Android APK y en Electron .exe) -->
+      <a v-if="isWeb" href="/Jandocity.apk" download="Jandocity.apk" class="group w-full flex items-center gap-3 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 active:translate-y-[2px] text-slate-900 rounded-xl px-4 py-3.5 shadow-[0_6px_0_#92400e,0_8px_16px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.35)] border-2 border-white/30 transition-all">
         <span class="w-11 h-11 rounded-lg bg-white/90 border-2 border-white flex items-center justify-center text-xl shadow-inner">📲</span>
         <div class="text-left flex-1">
           <div class="font-black text-sm tracking-wide leading-none">DESCARGAR PARA ANDROID</div>
@@ -71,7 +73,15 @@ const isNative = (() => { try { return Capacitor.isNativePlatform() } catch { re
         </div>
         <span class="w-7 h-7 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-xs group-active:scale-95">⬇</span>
       </a>
-      <p v-if="!isNative" class="text-[10px] text-white/30 text-center -mt-2 font-mono">Instalación directa — habilita “orígenes desconocidos” si te lo pide Android</p>
+      <a v-if="isWeb" href="/Jandocity-Portable-0.1.40.exe" download="Jandocity-Portable-0.1.40.exe" class="group w-full flex items-center gap-3 bg-gradient-to-r from-sky-400 to-indigo-500 hover:from-sky-300 hover:to-indigo-400 active:translate-y-[2px] text-white rounded-xl px-4 py-3.5 shadow-[0_6px_0_#1e1b4b,0_8px_16px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.25)] border-2 border-white/30 transition-all">
+        <span class="w-11 h-11 rounded-lg bg-white/90 border-2 border-white flex items-center justify-center text-xl shadow-inner">🪟</span>
+        <div class="text-left flex-1">
+          <div class="font-black text-sm tracking-wide leading-none" style="text-shadow:0 1px 0 #1e1b4b">DESCARGAR PARA WINDOWS</div>
+          <div class="text-[11px] text-white/80 leading-none font-bold mt-1">.EXE portable • sin instalar • offline</div>
+        </div>
+        <span class="w-7 h-7 rounded-full bg-white text-[#1e3a8a] flex items-center justify-center font-black text-xs group-active:scale-95">⬇</span>
+      </a>
+      <p v-if="isWeb" class="text-[10px] text-white/30 text-center -mt-2 font-mono">Windows: portable — doble click y juega. Android: habilita “orígenes desconocidos”</p>
 
       <button @click="exitApp" class="w-full mt-2 flex items-center justify-center gap-2 bg-black/40 hover:bg-black/60 text-white/70 hover:text-white rounded-xl px-4 py-3 border border-white/10 text-xs font-bold tracking-widest">⏻ SALIR DEL JUEGO</button>
 

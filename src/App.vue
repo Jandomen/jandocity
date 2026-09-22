@@ -43,9 +43,13 @@ import { APP_URL } from '@/config.js'
 import { usePerformance } from '@/composables/usePerformance.js'
 import { Capacitor } from '@capacitor/core'
 import UpdatePrompt from '@/components/UpdatePrompt.vue'
+import DesktopUpdatePrompt from '@/components/DesktopUpdatePrompt.vue'
 
 const city = useCityStore()
 const player = usePlayerStore()
+const isElectron = computed(() => {
+  try { return !!window.__JANDOCITY_ELECTRON__?.isElectron } catch { return false }
+})
 const isNative = computed(() => {
   try { if (Capacitor.isNativePlatform()) return true } catch {}
   try { if (window.Capacitor?.isNativePlatform?.()) return true } catch {}
@@ -54,6 +58,7 @@ const isNative = computed(() => {
   if (location.protocol === 'capacitor:' || location.href.includes('capacitor://')) return true
   return false
 })
+const isDesktop = computed(() => isElectron.value || isNative.value)
 const containerStyle = computed(() => {
   // IMMERSIVE: WebView ocupa toda la ventana (edge-to-edge, barras ocultas).
   // No poner padding en el contenedor: el mapa va fullscreen.
@@ -643,6 +648,7 @@ onUnmounted(() => {
     <AuthModal :show="showAuth" @close="showAuth=false" @authenticated="onAuthenticated" />
     <CharacterSelect :show="showCharacterSelect" @select="handleCharacterSelect" @close="handleCharacterClose" />
     <UpdatePrompt />
+    <DesktopUpdatePrompt />
     <div v-if="appState==='menu' && isLogged" class="absolute top-2 right-2 z-30">
       <button @click="doLogout" class="px-2.5 py-1 rounded-full bg-black/60 border border-white/15 text-[11px] text-white">Salir</button>
     </div>
