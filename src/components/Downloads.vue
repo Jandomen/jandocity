@@ -50,9 +50,9 @@ async function handleDownload(platform, href) {
       <div class="w-full bg-gradient-to-br from-[#14532d] to-[#052e16] border-[3px] border-[#16a34a] rounded-xl p-4 shadow-[0_6px_0_#052e16,0_8px_16px_rgba(0,0,0,0.4)] flex flex-col gap-3">
         <div class="flex items-center gap-3">
           <div class="w-14 h-14 rounded-xl bg-white flex items-center justify-center shadow-inner border-2 border-white/20 shrink-0">
-            <!-- Android logo oficial SVG -->
-            <svg viewBox="0 0 24 24" class="w-9 h-9" fill="#3DDC84" xmlns="http://www.w3.org/2000/svg">
-              <path d="M6 18c0 .55.45 1 1 1h1v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h2v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h1c.55 0 1-.45 1-1V8H6v10zM3.5 8C2.67 8 2 8.67 2 9.5S2.67 11 3.5 11 5 10.33 5 9.5 4.33 8 3.5 8zm13 0c-.83 0-1.5.67-1.5 1.5S15.67 11 16.5 11 18 10.33 18 9.5 17.33 8 16.5 8zm-7 0c-.83 0-1.5.67-1.5 1.5S8.67 11 9.5 11 11 10.33 11 9.5 9.5 8 9.5 8zm-3.5 2.5h8V5.5A4.5 4.5 0 0 0 9.5 1 4.5 4.5 0 0 0 5 5.5v5z"/>
+            <!-- Android logo oficial react-icons FaAndroid -->
+            <svg viewBox="0 0 576 512" class="w-9 h-9" fill="#3DDC84" xmlns="http://www.w3.org/2000/svg">
+              <path d="M420.55,301.93a24,24,0,1,1,24-24,24,24,0,0,1-24,24m-265.1,0a24,24,0,1,1,24-24,24,24,0,0,1-24,24m273.7-144.48,47.94-83a10,10,0,1,0-17.27-10h0l-48.54,84.07a301.25,301.25,0,0,0-246.56,0L116.18,64.45a10,10,0,1,0-17.27,10h0l47.94,83C64.53,202.22,8.24,285.55,0,384H576c-8.24-98.45-64.54-181.78-146.85-226.55"/>
             </svg>
           </div>
           <div class="flex-1">
@@ -71,9 +71,9 @@ async function handleDownload(platform, href) {
       <div class="w-full bg-gradient-to-br from-[#1e3a8a] to-[#1e1b4b] border-[3px] border-[#38bdf8] rounded-xl p-4 shadow-[0_6px_0_#1e1b4b,0_8px_16px_rgba(0,0,0,0.4)] flex flex-col gap-3">
         <div class="flex items-center gap-3">
           <div class="w-14 h-14 rounded-xl bg-white flex items-center justify-center shadow-inner border-2 border-white/20 shrink-0">
-            <!-- Windows logo oficial 4 panes -->
-            <svg viewBox="0 0 24 24" class="w-8 h-8" xmlns="http://www.w3.org/2000/svg">
-              <path fill="#00A4EF" d="M3 3.5h8v8H3z"/><path fill="#FFB900" d="M13 3.5h8v8h-8z"/><path fill="#7FBA00" d="M3 13.5h8v8H3z"/><path fill="#F25022" d="M13 13.5h8v8h-8z"/>
+            <!-- Windows logo oficial react-icons FaWindows -->
+            <svg viewBox="0 0 448 512" class="w-8 h-8" fill="#0078D6" xmlns="http://www.w3.org/2000/svg">
+              <path d="M0 93.7l183.6-25.3v177.4H0V93.7zm0 324.6l183.6 25.3V268.4H0v149.9zm203.8 28L448 480V268.4H203.8v177.9zm0-380.6v180.1H448V32L203.8 65.7z"/>
             </svg>
           </div>
           <div class="flex-1">
@@ -101,13 +101,9 @@ async function handleDownload(platform, href) {
       <div class="w-full bg-gradient-to-br from-[#7c2d12] to-[#431407] border-[3px] border-[#fb923c] rounded-xl p-4 shadow-[0_6px_0_#431407,0_8px_16px_rgba(0,0,0,0.4)] flex flex-col gap-3">
         <div class="flex items-center gap-3">
           <div class="w-14 h-14 rounded-xl bg-white flex items-center justify-center shadow-inner border-2 border-white/20 shrink-0">
-            <!-- Tux Linux logo simplificado -->
-            <svg viewBox="0 0 24 24" class="w-9 h-9" xmlns="http://www.w3.org/2000/svg">
-              <ellipse cx="12" cy="14.5" rx="7" ry="6.5" fill="#000"/><ellipse cx="12" cy="14.2" rx="6.2" ry="5.8" fill="#fff"/>
-              <ellipse cx="9.2" cy="12.2" rx="1.1" ry="1.5" fill="#000"/><ellipse cx="14.8" cy="12.2" rx="1.1" ry="1.5" fill="#000"/>
-              <ellipse cx="12" cy="15.8" rx="1.8" ry="1.2" fill="#FFC107" stroke="#000" stroke-width="0.4"/>
-              <path d="M9 9c0-1.5 1.3-2.7 3-2.7S15 7.5 15 9" fill="none" stroke="#000" stroke-width="0.7"/>
-              <ellipse cx="10" cy="10.2" rx="0.4" ry="0.6" fill="#fff"/><ellipse cx="14" cy="10.2" rx="0.4" ry="0.6" fill="#fff"/>
+            <!-- Linux logo oficial react-icons FaLinux -->
+            <svg viewBox="0 0 448 512" class="w-8 h-8" fill="#000" xmlns="http://www.w3.org/2000/svg">
+              <path d="M220.8 123.3c1 .5 1.8 1.7 3 1.7 1.1 0 2.8-.4 2.9-1.5.2-1.4-1.9-2.3-3.2-2.9-1.7-.7-3.9-1-5.5-.1-.4.2-.8.7-.6 1.1.3 1.3 2.3 1.1 3.4 1.7zm-21.9 1.7c1.2 0 2-1.2 3-1.7 1.1-.6 3.1-.4 3.5-1.6.2-.4-.2-.9-.6-1.1-1.6-.9-3.8-.6-5.5.1-1.3.6-3.4 1.5-3.2 2.9.1 1 1.8 1.5 2.8 1.4zM420 403.8c-3.6-4-5.3-11.6-7.2-19.7-1.8-8.1-3.9-16.8-10.5-22.4-1.3-1.1-2.6-2.1-4-2.9-1.3-.8-2.7-1.5-4.1-2 9.2-27.3 5.6-54.5-3.7-79.1-11.4-30.1-31.3-56.4-46.5-74.4-17.1-21.5-33.7-41.9-33.4-72C311.1 85.4 315.7.1 234.8 0 132.4-.2 158 103.4 156.9 135.2c-1.7 23.4-6.4 41.8-22.5 64.7-18.9 22.5-45.5 58.8-58.1 96.7-6 17.9-8.8 36.1-6.2 53.3-6.5 5.8-11.4 14.7-16.6 20.2-4.2 4.3-10.3 5.9-17 8.3s-14 6-18.5 14.5c-2.1 3.9-2.8 8.1-2.8 12.4 0 3.9.6 7.9 1.2 11.8 1.2 8.1 2.5 15.7.8 20.8-5.2 14.4-5.9 24.4-2.2 31.7 3.8 7.3 11.4 10.5 20.1 12.3 17.3 3.6 40.8 2.7 59.3 12.5 19.8 10.4 39.9 14.1 55.9 10.4 11.6-2.6 21.1-9.6 25.9-20.2 12.5-.1 26.3-5.4 48.3-6.6 14.9-1.2 33.6 5.3 55.1 4.1.6 2.3 1.4 4.6 2.5 6.7v.1c8.3 16.7 23.8 24.3 40.3 23 16.6-1.3 34.1-11 48.3-27.9 13.6-16.4 36-23.2 50.9-32.2 7.4-4.5 13.4-10.1 13.9-18.3.4-8.2-4.4-17.3-15.5-29.7z"/>
             </svg>
           </div>
           <div class="flex-1">

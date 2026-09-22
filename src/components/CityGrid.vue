@@ -291,6 +291,17 @@ function getValidation(cell) {
 
 async function handleCellClick(cell) {
   if (wasDragging) return
+  // Si hay arma remota pendiente, disparar con cuenta regresiva (no construir)
+  if (city.pendingRemoteWeapon) {
+    const weaponId = city.pendingRemoteWeapon
+    const res = city.remoteStrike(cell.x, cell.y, weaponId)
+    if (!res.ok && res.reason) showAviso(res.reason)
+    else if (res.countdown) showAviso(`🎯 ${weaponId} a (${cell.x},${cell.y}) • ${res.remaining}s cayendo`)
+    else showAviso(`🎯 ${weaponId} a (${cell.x},${cell.y})`)
+    // no limpiamos inmediatamente para que se vea cayendo; App limpia al terminar, aquí solo quitamos selección
+    city.pendingRemoteWeapon = null
+    return
+  }
   // Selección y órdenes (single y multi)
   const isMultiActive = isMulti.value
   const activeSelect = single.isActive || isMultiActive
@@ -513,6 +524,16 @@ async function handleCellEnter(cell) {
         </template>
       </div>
 
+      <!-- Bombas/misiles cayendo — como aviones: del cielo al objetivo, sin cuadro -->
+      <div v-for="cd in city.atomicCountdowns" :key="cd.id" class="absolute pointer-events-none z-10" :style="{ left: (cd.x - city.offsetX) * 48 + 'px', top: (cd.y - city.offsetY) * 48 + 'px' }">
+        <div class="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center" :style="{ top: (-90 - (10 - cd.remaining) * 9) + 'px', opacity: 0.95 }">
+          <span class="text-[26px] leading-none drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]" :style="{ transform: `rotate(${cd.heavy ? 18 : cd.weaponId==='missile' ? 22 : 12}deg) scale(${cd.heavy ? 1.25 : 1})` }">{{ cd.heavy ? '💣' : cd.weaponId==='missile' ? '🚀' : cd.weaponId==='rocket' ? '🚀' : '☢️' }}</span>
+          <span class="w-0.5 h-6 bg-gradient-to-b from-white/70 to-transparent blur-[0.5px] mt-0.5"></span>
+        </div>
+        <div class="absolute left-1/2 -translate-x-1/2 top-1 w-10 h-10 border border-dashed rounded-full opacity-40" :class="cd.heavy ? 'border-orange-400' : cd.weaponId==='missile' ? 'border-sky-400' : 'border-amber-400'"></div>
+        <div class="absolute left-1/2 -translate-x-1/2 -top-1 w-2 h-2 bg-black/30 blur-[1px] rounded-full"></div>
+      </div>
+
       <!-- Cola construcción 0-100% — single y multi -->
       <div v-if="filteredBuildQueue.length" class="absolute inset-0 pointer-events-none">
         <div
@@ -608,3 +629,9 @@ async function handleCellEnter(cell) {
     </div>
   </main>
 </template>
+
+<style>
+.bomb-drop { animation: bombDropFall 1.1s ease-in-out infinite alternate; }
+.bomb-drop.heavy { animation: bombDropFall 0.9s ease-in-out infinite alternate; }
+@keyframes bombDropFall { 0% { transform: translateY(-8px); } 100% { transform: translateY(6px); } }
+</style>

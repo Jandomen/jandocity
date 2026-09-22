@@ -673,29 +673,14 @@ onUnmounted(() => {
       <!-- Victoria / Derrota -->
       <VictoryOverlay :show="showVictory" :isWin="victoryData?.isWin" :winner="victoryData?.winner" :metrics="victoryData?.metrics" @menu="closeVictory(true)" @rematch="closeVictory(false)" />
       <AtomicFlash :trigger="atomicTrigger" :heavy="atomicHeavy" />
-      <!-- Cuenta regresiva apilada — cada bomba con su plantilla de caída -->
+      <!-- Cuenta regresiva — solo número arriba, sin cuadro central bloqueante -->
       <Transition name="fade">
-        <div v-if="atomicCountdowns.length && appState==='playing'" class="fixed inset-0 z-[75] pointer-events-none flex flex-col items-center justify-center gap-3 bg-black/40 backdrop-blur-[2px] p-4">
-          <div v-for="cd in atomicCountdowns" :key="cd.id" class="relative bg-[#0f172a] border-[3px] rounded-xl px-6 py-4 flex flex-col items-center gap-2 shadow-[0_8px_24px_rgba(0,0,0,0.7)] overflow-hidden w-full max-w-[320px]" :class="cd.heavy ? 'border-orange-500 shadow-[0_0_26px_rgba(249,115,22,0.5)]' : cd.weaponId==='missile' ? 'border-sky-500 shadow-[0_0_24px_rgba(14,165,233,0.5)]' : cd.weaponId==='rocket' ? 'border-emerald-500 shadow-[0_0_24px_rgba(16,185,129,0.5)]' : 'border-amber-500 shadow-[0_0_24px_rgba(245,158,11,0.5)]'">
-            <div class="absolute inset-0 pointer-events-none overflow-hidden opacity-30">
-              <div class="bomb-fall absolute left-1/2 -translate-x-1/2 scale-75" :class="cd.heavy ? 'heavy' : cd.weaponId==='missile' ? 'missile' : cd.weaponId==='rocket' ? 'rocket' : 'normal'">
-                <div class="flex flex-col items-center">
-                  <div class="text-[8px] font-black tracking-widest px-1.5 py-0.5 rounded-full border" :class="cd.heavy ? 'bg-orange-600 border-orange-300 text-white' : cd.weaponId==='missile' ? 'bg-sky-600 border-sky-300 text-white' : cd.weaponId==='rocket' ? 'bg-emerald-600 border-emerald-300 text-white' : 'bg-amber-600 border-amber-300 text-white'">{{ cd.heavy ? 'PESADA' : cd.weaponId==='missile' ? 'MISIL' : cd.weaponId==='rocket' ? 'COHETE' : 'ATÓMICA' }}</div>
-                  <div class="text-2xl mt-0.5">{{ cd.heavy ? '💣' : cd.weaponId==='missile' ? '🚀' : cd.weaponId==='rocket' ? '🚀' : '☢️' }}</div>
-                </div>
-              </div>
-            </div>
-            <div class="flex items-center gap-2 w-full">
-              <div class="w-9 h-9 rounded-full flex items-center justify-center text-sm border border-white/20 shrink-0" :class="cd.heavy ? 'bg-gradient-to-br from-orange-500 to-red-600' : cd.weaponId==='missile' ? 'bg-gradient-to-br from-sky-500 to-indigo-600' : cd.weaponId==='rocket' ? 'bg-gradient-to-br from-emerald-500 to-teal-600' : 'bg-gradient-to-br from-amber-500 to-orange-600'">{{ cd.heavy ? '💥' : cd.weaponId==='missile' ? '🚀' : cd.weaponId==='rocket' ? '🚀' : '☢️' }}</div>
-              <div class="flex-1 text-left">
-                <div class="text-[11px] font-black tracking-wide" :class="cd.heavy ? 'text-orange-300' : cd.weaponId==='missile' ? 'text-sky-300' : cd.weaponId==='rocket' ? 'text-emerald-300' : 'text-amber-300'">{{ cd.heavy ? 'PESADA 11×11' : cd.weaponId==='missile' ? 'MISIL 5×5' : cd.weaponId==='rocket' ? 'COHETE 3×3' : 'ATÓMICA 7×7' }}</div>
-                <div class="text-[10px] font-mono text-white/50">({{ cd.x }},{{ cd.y }}) • Y{{ cd.y < 0 ? '↑' : '↓' }}</div>
-              </div>
-              <div class="text-3xl font-black" :class="cd.heavy ? 'text-orange-500' : cd.weaponId==='missile' ? 'text-sky-400' : cd.weaponId==='rocket' ? 'text-emerald-400' : 'text-amber-500'" style="text-shadow:0 2px 0 rgba(0,0,0,0.6)">{{ cd.remaining }}</div>
-            </div>
-            <div class="w-full h-1.5 bg-black/50 rounded-full overflow-hidden border border-white/10 p-0.5">
-              <div class="h-full rounded-full transition-all duration-1000 ease-linear" :class="cd.heavy ? 'bg-gradient-to-r from-orange-600 to-red-600' : cd.weaponId==='missile' ? 'bg-gradient-to-r from-sky-500 to-indigo-500' : cd.weaponId==='rocket' ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-gradient-to-r from-amber-500 to-orange-600'" :style="{ width: (cd.remaining/(cd.heavy?10:cd.weaponId==='missile'?5:cd.weaponId==='rocket'?3:7)*100)+'%' }"></div>
-            </div>
+        <div v-if="atomicCountdowns.length && appState==='playing'" class="fixed top-[78px] inset-x-0 z-[75] pointer-events-none flex flex-col items-center gap-1.5 px-2">
+          <div v-for="cd in atomicCountdowns" :key="cd.id" class="bg-black/70 backdrop-blur border px-3 py-1 rounded-full flex items-center gap-2 shadow-[0_2px_8px_rgba(0,0,0,0.5)]" :class="cd.heavy ? 'border-orange-500/50' : cd.weaponId==='missile' ? 'border-sky-500/50' : cd.weaponId==='rocket' ? 'border-emerald-500/50' : 'border-amber-500/50'">
+            <span class="text-[11px]">{{ cd.heavy ? '💣' : cd.weaponId==='missile' ? '🚀' : cd.weaponId==='rocket' ? '🚀' : '☢️' }}</span>
+            <span class="text-[10px] font-black tracking-widest" :class="cd.heavy ? 'text-orange-300' : cd.weaponId==='missile' ? 'text-sky-300' : cd.weaponId==='rocket' ? 'text-emerald-300' : 'text-amber-300'">{{ cd.heavy ? 'PESADA' : cd.weaponId==='missile' ? 'MISIL' : cd.weaponId==='rocket' ? 'COHETE' : 'ATÓMICA' }} ({{ cd.x }},{{ cd.y }})</span>
+            <span class="text-lg font-black leading-none" :class="cd.heavy ? 'text-orange-400' : cd.weaponId==='missile' ? 'text-sky-400' : cd.weaponId==='rocket' ? 'text-emerald-400' : 'text-amber-400'">{{ cd.remaining }}</span>
+            <span class="text-[10px] font-mono text-white/40">s</span>
           </div>
         </div>
       </Transition>
