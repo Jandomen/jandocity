@@ -151,6 +151,43 @@ export function createSoundEffects() {
         setTimeout(tick, heavy ? 620 : 560)
       }
       tick()
+    },
+    playAtomicCountdownTick(remaining) {
+      const ctx = getContext()
+      if (ctx.state === 'suspended') ctx.resume()
+      // tick agudo + grave alternado, más urgente cuando queda poco
+      const freq = remaining <= 2 ? 920 : remaining <= 4 ? 720 : 520
+      const vol = remaining <= 2 ? 0.34 : 0.28
+      blip(freq, 0.12, vol, 'square')
+      if (remaining <= 2) setTimeout(()=>blip(freq*0.5, 0.18, vol*0.9, 'sawtooth', -40), 60)
+    },
+    playAtomicHeavyImpact() {
+      const ctx = getContext()
+      if (ctx.state === 'suspended') ctx.resume()
+      // impacto escabroso: sub-grave + crujido + eco largo y tenebroso
+      blip(22, 0.6, 0.55, 'sawtooth')
+      setTimeout(()=>blip(35, 0.5, 0.48, 'triangle'), 40)
+      setTimeout(()=>blip(85, 0.35, 0.30, 'square', -30), 120)
+      setTimeout(()=>blip(45, 0.9, 0.38, 'sawtooth', -20), 260)
+      setTimeout(()=>blip(18, 1.2, 0.42, 'triangle'), 400)
+      // crujido secundario
+      setTimeout(()=>{ blip(120, 0.15, 0.20, 'sawtooth'); blip(60, 0.22, 0.18, 'square') }, 520)
+      // onda tenebrosa grave
+      setTimeout(()=>blip(28, 0.8, 0.32, 'sine'), 800)
+    },
+    playAtomicNormalImpact() {
+      blip(45, 0.22, 0.42, 'sawtooth'); setTimeout(()=>blip(30, 0.32, 0.38, 'triangle'), 70); setTimeout(()=>{ blip(90, 0.12, 0.22, 'square'); blip(120, 0.10, 0.16, 'square') }, 160)
+      setTimeout(()=>blip(60, 0.25, 0.20, 'square'), 280)
+    },
+    playMissileWhistle() {
+      const ctx = getContext()
+      if (ctx.state === 'suspended') ctx.resume()
+      // silbido de misil cayendo: frecuencia descendente aguda
+      blip(900, 0.25, 0.18, 'sine'); setTimeout(()=>blip(700, 0.22, 0.16, 'sine'), 120); setTimeout(()=>blip(400, 0.28, 0.20, 'square', -120), 260)
+    },
+    playMissileImpact() {
+      blip(55, 0.18, 0.40, 'sawtooth'); setTimeout(()=>blip(35, 0.24, 0.34, 'triangle'), 50); setTimeout(()=>blip(110, 0.12, 0.18, 'square'), 140)
+      setTimeout(()=>blip(180, 0.08, 0.14, 'square'), 200)
     }
   }
 }

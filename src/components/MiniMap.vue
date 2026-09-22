@@ -218,7 +218,11 @@ watch(() => [camera.x.value, camera.y.value, player.x, player.y], draw)
       </div>
       <div v-if="isTargeting" class="shrink-0 px-3 py-2 bg-red-950/60 border-b border-red-800/50 text-[11px] text-red-200 flex items-center gap-2">
         <span class="animate-pulse">●</span>
-        <span>Selecciona en el mapa dónde caerá el ataque. El suelo quedará <b class="text-white">gris con escombros</b> hasta que vuelva el pasto (12s → tierra, 37s → pasto).</span>
+        <span v-if="pendingWeapon==='atomic_heavy'">Pesada: cuenta 10s • caída 💣 + destrucción 11×11 <b class="text-amber-300">suelo calcinado 1h</b> + música tenebrosa + impacto escabroso.</span>
+        <span v-else-if="pendingWeapon==='atomic'">Atómica: cuenta 7s • caída ☢️ + destrucción 7×7.</span>
+        <span v-else-if="pendingWeapon==='missile'">Misil: cuenta 5s • caída 🚀 + 5×5.</span>
+        <span v-else-if="pendingWeapon==='rocket'">Cohete: cuenta 3s • caída 🚀 + 3×3.</span>
+        <span v-else>Selecciona en el mapa dónde caerá el ataque.</span>
       </div>
       <div class="flex-1 overflow-auto p-3 flex items-center justify-center bg-[#0f172a] gap-2">
         <canvas ref="canvasRef" @click="handleCanvasClick" @mousemove="handleCanvasMove" @mouseleave="hoverPos=null; draw()" class="border border-white/10 rounded shadow shrink-0" :class="isTargeting ? 'cursor-crosshair ring-2 ring-red-500' : 'cursor-default'" style="image-rendering: pixelated; width: min(400px, 82vw, 56vh); height: min(400px, 82vw, 56vh);"></canvas>

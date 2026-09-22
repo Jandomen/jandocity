@@ -112,7 +112,7 @@ async function handleDownload(platform, href) {
           </div>
           <div class="flex-1">
             <div class="font-black text-white text-sm tracking-wide flex items-center gap-2 flex-wrap">LINUX <span class="text-[10px] bg-white text-[#7c2d12] px-2 py-0.5 rounded-full">{{ (Number(counts.linux_deb)+Number(counts.linux_appimage)).toLocaleString() }} descargas</span></div>
-            <div class="text-[11px] text-white/70 leading-none mt-1">DEB & AppImage • offline • Ubuntu/Debian</div>
+            <div class="text-[11px] text-white/70 leading-none mt-1">Instalador • portable</div>
           </div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -132,7 +132,7 @@ async function handleDownload(platform, href) {
         <p class="text-[10px] text-white/30 font-mono text-center">AppImage por límite GitHub 100MB → en Releases</p>
       </div>
 
-      <div class="text-[10px] text-white/20 font-mono text-center py-2">Contador en tiempo real • Supabase • offline no necesita internet para jugar</div>
+      <div class="text-[10px] text-white/10 font-mono text-center py-2 opacity-0 select-none">—</div>
     </div>
   </div>
 </template>

@@ -13,6 +13,7 @@ import { TERRAIN_TYPES } from '@/constants/terrain.js'
 import { canPlaceAt } from '@/composables/useCityEngine.js'
 import { saveGame, loadGame, deleteSave } from '@/utils/persistence.js'
 import { generateTerrainGrid } from '@/utils/terrainGenerator.js'
+import { useSinglePlayerStore } from '@/stores/singlePlayerStore.js'
 
   // Helper: mundo centrado en 0,0 — coordenadas mundo, no esquina
   function createEmptyGrid(seed = Date.now()) {
@@ -72,6 +73,8 @@ export const useCityStore = defineStore('city', () => {
   const selectedWallVariant = ref('straight-h')
   const selectedHouseVariant = ref('residential')
   const pendingRemoteWeapon = ref(null) // weaponId pendiente para disparo vía mapa (control remoto)
+  const atomicCountdown = ref(null) // compat single
+  const atomicCountdowns = ref([]) // [{ id, weaponId, x, y, remaining, heavy, until }] apiladas
   const tickCount = ref(0)
   const isPaused = ref(false)
   const lastTickAt = ref(null)
@@ -642,20 +645,62 @@ export const useCityStore = defineStore('city', () => {
       if (money.value < cost) return { ok: false, reason: `Fondos insuficientes (${cost}💰)` }
       money.value -= cost
     }
-    let destroyed = 0
-    const rubbleCells = []
-    // Flash atómico si es atomic_* — pesada naranja + casi negro
     const isAtomic = weaponId === 'atomic' || weaponId === 'atomic_heavy'
     const isHeavy = weaponId === 'atomic_heavy'
+
+    // Proyectiles: cuenta desde 10s y sucesivamente — apiladas si varios jugadores lanzan a la vez
+    const isProjectile = ['rocket','missile','atomic','atomic_heavy'].includes(weaponId)
+    if (isProjectile) {
+      const COUNTDOWN_SEC = isHeavy ? 10 : weaponId === 'atomic' ? 7 : weaponId === 'missile' ? 5 : 3
+      const id = Date.now() + Math.random()
+      const entry = { id, weaponId, x: targetX, y: targetY, remaining: Math.ceil(COUNTDOWN_SEC), heavy: isHeavy }
+      atomicCountdown.value = entry
+      atomicCountdowns.value.push(entry)
+      try { (globalThis||window).dispatchEvent(new CustomEvent('atomic-countdown', { detail: { weaponId, x: targetX, y: targetY, heavy: isHeavy, remaining: Math.ceil(COUNTDOWN_SEC), id } })) } catch {}
+      if (isAtomic) {
+        try { (globalThis||window).dispatchEvent(new CustomEvent('atomic-tenebrous-music', { detail: { heavy: isHeavy } })) } catch {}
+      }
+      let remaining = COUNTDOWN_SEC
+      const tickMs = 1000
+      const countdownTimer = setInterval(() => {
+        remaining -= tickMs/1000
+        const disp = Math.ceil(remaining)
+        const idx = atomicCountdowns.value.findIndex(e=>e.id===id)
+        if (remaining > 0) {
+          if (idx!==-1) atomicCountdowns.value[idx].remaining = disp
+          atomicCountdown.value = { weaponId, x: targetX, y: targetY, remaining: disp, heavy: isHeavy, id }
+          try { (globalThis||window).dispatchEvent(new CustomEvent('atomic-countdown', { detail: { weaponId, x: targetX, y: targetY, heavy: isHeavy, remaining: disp, id } })) } catch {}
+        } else {
+          clearInterval(countdownTimer)
+          if (idx!==-1) atomicCountdowns.value.splice(idx,1)
+          // mantén single como el último o null
+          atomicCountdown.value = atomicCountdowns.value[atomicCountdowns.value.length-1] || null
+          try { (globalThis||window).dispatchEvent(new CustomEvent('atomic-countdown-end', { detail: { weaponId, x: targetX, y: targetY, heavy: isHeavy, id } })) } catch {}
+          executeBlast()
+        }
+      }, tickMs)
+      const icon = isHeavy ? '💥' : weaponId === 'atomic' ? '☢️' : '🚀'
+      log(`${icon} ${weaponId} programado en (${targetX},${targetY}) • impacto en ${COUNTDOWN_SEC}s -${cost}💰`)
+      return { ok: true, countdown: true, remaining: COUNTDOWN_SEC, id }
+    }
+    return executeBlast()
+
+    function executeBlast() {
+    let destroyed = 0
+    const rubbleCells = []
     const terrainIdForBlast = isHeavy ? 'scorched' : 'rubble'
+    const isMissile = weaponId === 'missile' || weaponId === 'rocket'
     if (isAtomic) {
       try { (globalThis||window).dispatchEvent(new CustomEvent('atomic-flash', { detail: { weaponId, heavy: isHeavy } })) } catch {}
-      // fallback simple
       try { (globalThis||window).dispatchEvent(new CustomEvent('atomic-flash')) } catch {}
+    } else if (isMissile) {
+      try { (globalThis||window).dispatchEvent(new CustomEvent('missile-flash', { detail: { weaponId } })) } catch {}
     }
-    // alarma atómica solo para atómicas (no cohetes) — suena un tiempo en otras ciudades
     if (isAtomic) {
       try { (globalThis||window).dispatchEvent(new CustomEvent('atomic-alarm', { detail: { weaponId, x: targetX, y: targetY, heavy: isHeavy } })) } catch {}
+      try { (globalThis||window).dispatchEvent(new CustomEvent('atomic-tenebrous-music', { detail: { heavy: isHeavy } })) } catch {}
+    } else if (isMissile) {
+      try { (globalThis||window).dispatchEvent(new CustomEvent('missile-impact-sound', { detail: { weaponId } })) } catch {}
     }
     const startX = targetX - radius
     const endX = targetX + radius
@@ -707,17 +752,64 @@ export const useCityStore = defineStore('city', () => {
         }
       }
     }
-    // Rubble/scorched regeneración: mismo patrón que demolish 12s→dirt 37s→grass
+    // Onda exterior: más grande que el centro, otra textura, también se regenera (pero más rápido)
+    // heavy 11×11 centro scorched + 17×17 onda rubble, atomic 7×7 + 13×13, missile 5×5 + 9×9, rocket 3×3 + 7×7
+    const outerRadius = isHeavy ? 8 : weaponId === 'atomic' ? 6 : weaponId === 'missile' ? 4 : weaponId === 'rocket' ? 3 : radius + 2
+    const outerTerrain = isHeavy ? 'rubble' : 'dirt' // centro scorched→onda rubble, centro rubble→onda dirt (más claro)
+    const outerCells = []
+    // Onda 100% destrucción donde llega — todo lo que toque desaparece, textura distinta al centro
+    for (let y = targetY - outerRadius; y <= targetY + outerRadius; y++) {
+      for (let x = targetX - outerRadius; x <= targetX + outerRadius; x++) {
+        if (Math.abs(x - targetX) <= radius && Math.abs(y - targetY) <= radius) continue // ya es centro
+        // onda llena, sin huecos: todo dentro de outerRadius se destruye
+        const cell = getCell(x, y)
+        if (!cell) continue
+        let origin = cell
+        let ox = x, oy = y
+        if (cell.isChild && cell.occupiedBy) { ox = cell.occupiedBy.x; oy = cell.occupiedBy.y; origin = getCell(ox, oy) || cell }
+        if (origin && origin.buildingId) {
+          const b = BUILDING_TYPES[origin.buildingId]
+          if (b) {
+            const w = b.width||1, h=b.height||1
+            for (let dy=0; dy<h; dy++) for (let dx=0; dx<w; dx++) {
+              const c = getCell(ox+dx, oy+dy)
+              if (c) { c.buildingId=null; c.isOrigin=false; c.isChild=false; c.occupiedBy=null; c.hasRoad=false; c.hasRail=false; c.roadVariant=null; c.railVariant=null; c.wallVariant=null; c.terrain=outerTerrain; c.terrainType=outerTerrain; outerCells.push({x:ox+dx,y:oy+dy}) }
+            }
+            destroyed++
+          }
+        } else {
+          if (cell.hasRoad||cell.hasRail) { cell.hasRoad=false; cell.hasRail=false; cell.roadVariant=null; cell.railVariant=null; if (['road','dirt_road','concrete_road','cobble_road','rail'].includes(cell.buildingId)) { cell.buildingId=null; cell.isOrigin=false; cell.isChild=false; cell.occupiedBy=null } }
+          cell.buildingId=null; cell.isOrigin=false; cell.isChild=false; cell.occupiedBy=null
+          if (cell.terrain !== outerTerrain && cell.terrain !== terrainIdForBlast) { cell.terrain=outerTerrain; cell.terrainType=outerTerrain; outerCells.push({x,y}) }
+        }
+      }
+    }
+    // Regeneración: centro y onda con tiempos distintos (onda regenera más rápido)
     const uniqueRubble = new Map(rubbleCells.map(c=>[`${c.x},${c.y}`,c]))
+    const uniqueOuter = new Map(outerCells.map(c=>[`${c.x},${c.y}`,c]))
+    const dirtDelay = isHeavy ? 1800000 : weaponId === 'atomic' ? 45000 : 12000
+    const grassDelay = isHeavy ? 3600000 : weaponId === 'atomic' ? 90000 : 37000
+    const outerDirtDelay = isHeavy ? 600000 : weaponId === 'atomic' ? 20000 : 8000
+    const outerGrassDelay = isHeavy ? 1200000 : weaponId === 'atomic' ? 40000 : 22000
     for (const rc of uniqueRubble.values()) {
       setTimeout(() => {
         const cc = getCell(rc.x, rc.y)
         if (cc && (cc.terrain === 'rubble' || cc.terrain === 'scorched') && !cc.buildingId && !cc.isChild) { cc.terrain='dirt'; cc.terrainType='dirt' }
-      }, 12000)
+      }, dirtDelay)
       setTimeout(() => {
         const cc2 = getCell(rc.x, rc.y)
         if (cc2 && cc2.terrain === 'dirt' && !cc2.buildingId && !cc2.isChild) { cc2.terrain='grass'; cc2.terrainType='grass' }
-      }, 37000)
+      }, grassDelay)
+    }
+    for (const rc of uniqueOuter.values()) {
+      setTimeout(() => {
+        const cc = getCell(rc.x, rc.y)
+        if (cc && cc.terrain === outerTerrain && !cc.buildingId && !cc.isChild) { cc.terrain='dirt'; cc.terrainType='dirt' }
+      }, outerDirtDelay)
+      setTimeout(() => {
+        const cc2 = getCell(rc.x, rc.y)
+        if (cc2 && cc2.terrain === 'dirt' && !cc2.buildingId && !cc2.isChild) { cc2.terrain='grass'; cc2.terrainType='grass' }
+      }, outerGrassDelay)
     }
     // Intento de daño a unidades — importa trafficStore lazy (evita circular)
     ;(async () => {
@@ -753,8 +845,12 @@ export const useCityStore = defineStore('city', () => {
     syncDerivedResources()
     immediateSave(); scheduleSave(800)
     const area = (radius*2+1)
-    log(`☢️ ${weaponId} en (${targetX},${targetY}) área ${area}x${area} • ${destroyed} edificios arrasados -${cost}💰 — escombros grises → pasto`)
+    const regenMsg = isHeavy ? ' — suelo calcinado ☠️ 1h para regenerar' : ' — escombros grises → pasto'
+    log(`☢️ ${weaponId} en (${targetX},${targetY}) área ${area}x${area} • ${destroyed} edificios arrasados -${cost}💰${regenMsg}`)
     return { ok: true, destroyed, rubble: uniqueRubble.size }
+    }
+
+    // cierre remoteStrike
   }
 
   function isWaterCell(cell) { return cell.terrain === 'water' || cell.terrain === 'deep_water' || cell.terrainType === 'water' || cell.terrainType === 'deep_water' }
@@ -1079,6 +1175,8 @@ export const useCityStore = defineStore('city', () => {
     selectedWallVariant,
     selectedHouseVariant,
     pendingRemoteWeapon,
+    atomicCountdown,
+    atomicCountdowns,
     tickCount,
     isPaused,
     lastTickAt,
