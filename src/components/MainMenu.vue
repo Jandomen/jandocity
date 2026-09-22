@@ -81,7 +81,15 @@ const isWeb = (() => !isNative && !isElectron)()
         </div>
         <span class="w-7 h-7 rounded-full bg-white text-[#1e3a8a] flex items-center justify-center font-black text-xs group-active:scale-95">⬇</span>
       </a>
-      <p v-if="isWeb" class="text-[10px] text-white/30 text-center -mt-2 font-mono">Windows: portable — doble click y juega. Android: habilita “orígenes desconocidos”</p>
+      <a v-if="isWeb" href="/Jandocity-0.1.40.deb" download="Jandocity-0.1.40.deb" class="group w-full flex items-center gap-3 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-400 hover:to-amber-500 active:translate-y-[2px] text-white rounded-xl px-4 py-3.5 shadow-[0_6px_0_#7c2d12,0_8px_16px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.25)] border-2 border-white/30 transition-all">
+        <span class="w-11 h-11 rounded-lg bg-white/90 border-2 border-white flex items-center justify-center text-xl shadow-inner">🐧</span>
+        <div class="text-left flex-1">
+          <div class="font-black text-sm tracking-wide leading-none" style="text-shadow:0 1px 0 #7c2d12">DESCARGAR PARA LINUX</div>
+          <div class="text-[11px] text-white/80 leading-none font-bold mt-1">.DEB (Ubuntu/Debian) • 86 MB • offline</div>
+        </div>
+        <span class="w-7 h-7 rounded-full bg-white text-[#9a3412] flex items-center justify-center font-black text-xs group-active:scale-95">⬇</span>
+      </a>
+      <p v-if="isWeb" class="text-[10px] text-white/30 text-center -mt-2 font-mono">Linux: sudo dpkg -i .deb • AppImage 123MB por límite GitHub → usa .deb</p>
 
       <button @click="exitApp" class="w-full mt-2 flex items-center justify-center gap-2 bg-black/40 hover:bg-black/60 text-white/70 hover:text-white rounded-xl px-4 py-3 border border-white/10 text-xs font-bold tracking-widest">⏻ SALIR DEL JUEGO</button>
 

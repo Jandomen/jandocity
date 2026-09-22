@@ -78,14 +78,21 @@ android/app/debug/
 *.jks
 !public/*.apk
 
-# Electron / Desktop — permite public/*.exe para descarga web
+# Electron / Desktop — permite public/* para descarga web
 release/
 out/
 *.exe
 !public/*.exe
+*.AppImage
+!public/*.AppImage
+*.deb
+!public/*.deb
+*.rpm
+!public/*.rpm
+*.snap
+!public/*.snap
 *.msi
 *.dmg
-*.AppImage
 *.blockmap
 
 # iOS (futuro)
