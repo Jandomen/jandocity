@@ -1297,6 +1297,15 @@
       <circle cx="28" cy="16" r="1.5" fill="#dcfce7" opacity="0.5" />
     </svg>
 
+    <!-- 15c NUEVOS — labs, clínica, ocio, verde, defensa, transporte -->
+    <svg v-else-if="['lab','observatory','ai_center','clinic','medical_uni','cinema','theme_park','zoo','nursery','wetland','bunker','radar_tower','heliport','metro_entry'].includes(type)" viewBox="0 0 100 100" class="w-full h-full">
+      <rect x="8" y="18" width="84" height="64" rx="4" fill="#1f2937" stroke="#334155" stroke-width="1.5" />
+      <rect x="10" y="12" width="80" height="12" rx="2" fill="#334155" />
+      <text x="50" y="21" font-size="5" font-weight="900" fill="#fff" text-anchor="middle">{{ {lab:'LAB 🧪', observatory:'OBS 🔭', ai_center:'IA 🤖', clinic:'CLÍNICA 🩺', medical_uni:'MEDI ⚕️', cinema:'CINE 🎬', theme_park:'PARQUE 🎢', zoo:'ZOO 🦁', nursery:'VIVERO 🌱', wetland:'HUMEDAL 🦆', bunker:'BÚNKER 🛡️', radar_tower:'RADAR 📡', heliport:'HELI 🚁', metro_entry:'METRO 🚇'}[type] }}</text>
+      <text x="50" y="52" font-size="22" text-anchor="middle">{{ {lab:'🧪', observatory:'🔭', ai_center:'🤖', clinic:'🩺', medical_uni:'⚕️', cinema:'🎬', theme_park:'🎢', zoo:'🦁', nursery:'🌱', wetland:'🦆', bunker:'🛡️', radar_tower:'📡', heliport:'🚁', metro_entry:'🚇'}[type] }}</text>
+      <text x="50" y="72" font-size="4" fill="#e2e8f0" text-anchor="middle" font-weight="700">{{ type.toUpperCase() }}</text>
+    </svg>
+
     <!-- 6b ÁRBOL genérico fallback -->
     <svg v-else-if="type === 'tree_fallback'" viewBox="0 0 100 100" class="w-full h-full">
       <!-- Sombra en suelo -->

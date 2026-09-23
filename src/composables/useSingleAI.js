@@ -4,7 +4,7 @@ import { useBuildQueue } from '@/composables/useBuildQueue.js'
 import { useUnitQueue } from '@/composables/useUnitQueue.js'
 import { useTrafficStore } from '@/stores/trafficStore.js'
 import { BUILDING_TYPES } from '@/constants/buildings.js'
-import { canPlaceAt } from '@/composables/useCityEngine.js'
+import { canPlaceAt, ROAD_REQUIRED_BUILDINGS } from '@/composables/useCityEngine.js'
 
 const BUILD_POOL = [
   'residential','residential_small','residential_medium','commercial','shop','supermarket','tower_residential','apartment_block',
@@ -78,19 +78,118 @@ export function useSingleAI() {
   function findRoadExpansionSpot(player) {
     const roads = city.flatGrid.filter(c => c.owner===player.id && (c.hasRoad || ['road','dirt_road','concrete_road'].includes(c.buildingId)))
     if (!roads.length) return null
-    const base = roads[Math.floor(Math.random()*Math.min(3, roads.length))]
-    const dirs = [[1,0],[-1,0],[0,1],[0,-1]]
-    for (const [dx, dy] of dirs.sort(()=>Math.random()-0.5)) {
-      const x = base.x + dx, y = base.y + dy
-      const ok = canPlaceAt(city.grid, x, y, 'road', 999999)
-      if (ok.ok && !buildQueue.findAt(x,y)) return { x, y, variant: getRoadVariantAt(x,y) }
+    // Evalúa todo el perímetro y puntúa para trazado coherente (rectas, cruces, cercanía a barrio)
+    const hasRoad = (nx, ny) => {
+      const c = city.getCell(nx, ny)
+      return !!(c && (c.hasRoad || ['road','dirt_road','concrete_road'].includes(c.buildingId)))
     }
-    return null
+    const candidates = []
+    for (const road of roads) {
+      for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+        const x = road.x + dx, y = road.y + dy
+        if (buildQueue.findAt(x,y)) continue
+        const ok = canPlaceAt(city.grid, x, y, 'road', 999999)
+        if (!ok.ok) continue
+        const n = hasRoad(x, y-1), s = hasRoad(x, y+1), e = hasRoad(x+1, y), w = hasRoad(x-1, y)
+        const cnt = [n,s,e,w].filter(Boolean).length
+        let score = 0
+        if (cnt === 1) score += 2 // extiende punta
+        if (cnt === 2) score += 3 // recta o curva que conecta
+        if (cnt >= 3) score += 2 // forma T/cross
+        // premia cercanía a edificios que necesitan carretera sin conexión
+        let nearNeed = 0
+        for (let dy2=-3; dy2<=3; dy2++) for (let dx2=-3; dx2<=3; dx2++) {
+          const c2 = city.getCell(x+dx2, y+dy2)
+          if (c2 && c2.isOrigin && ROAD_REQUIRED_BUILDINGS.includes(c2.buildingId) && c2.owner===player.id) nearNeed++
+        }
+        score += Math.min(2, nearNeed*0.4)
+        const distToBase = Math.abs(x-player.x)+Math.abs(y-player.y)
+        if (distToBase < 14) score += 1
+        else if (distToBase > 28) score -= 1.5
+        // premia continuar recta (si el road base ya es recta en esa dirección)
+        const baseStraightH = hasRoad(road.x+1, road.y) && hasRoad(road.x-1, road.y)
+        const baseStraightV = hasRoad(road.x, road.y+1) && hasRoad(road.x, road.y-1)
+        if ((baseStraightH && dy===0) || (baseStraightV && dx===0)) score += 1
+        candidates.push({ x, y, score, variant: getRoadVariantAt(x,y) })
+      }
+    }
+    if (!candidates.length) return null
+    candidates.sort((a,b)=>b.score-a.score)
+    const top = candidates.slice(0, Math.min(4, candidates.length))
+    return top[Math.floor(Math.random()*top.length)]
+  }
+
+  // Busca el mejor hueco para un edificio, priorizando estar pegado a carretera y formar barrio
+  function findBestBuildingSpot(player, buildingId) {
+    const b = BUILDING_TYPES[buildingId]; if (!b) return null
+    const w = b.width||1, h = b.height||1
+    const needsRoad = ROAD_REQUIRED_BUILDINGS.includes(buildingId)
+    const isResidential = ['residential','residential_small','residential_medium','residential_large','tower_residential','apartment_block','skyscraper'].includes(buildingId)
+    const isCommercial = ['commercial','shop','supermarket','mall','bank','hotel','hotel_large','restaurant','restaurant_small'].includes(buildingId)
+    const candidates = []
+    // muestrea anillo alrededor de cada carretera y edificio propio para barrio compacto
+    const anchors = city.flatGrid.filter(c=>c.owner===player.id && (c.hasRoad || c.isOrigin)).slice(0, 40)
+    // si no hay anclas, usa base
+    const bases = anchors.length ? anchors : [{x:player.x, y:player.y}]
+    for (const base of bases) {
+      for (let tries=0; tries<6; tries++) {
+        const dx = Math.floor(Math.random()*10)-5
+        const dy = Math.floor(Math.random()*10)-5
+        const x = base.x + dx, y = base.y + dy
+        if (buildQueue.findAt(x,y)) continue
+        const ok = canPlaceAt(city.grid, x, y, buildingId, 999999)
+        if (!ok.ok) continue
+        let score = Math.random()*0.5 // variedad
+        // debe tocar carretera si lo requiere
+        const touchesRoad = (()=>{ for(let dy2=-1; dy2<=h; dy2++) for(let dx2=-1; dx2<=w; dx2++){ if(dx2>=0&&dx2<w&&dy2>=0&&dy2<h) continue; const c2=city.getCell(x+dx2,y+dy2); if(c2 && (c2.hasRoad||['road','dirt_road','concrete_road'].includes(c2.buildingId))) return true } return false })()
+        if (needsRoad) {
+          if (touchesRoad) score += 3
+          else score -= 5
+        } else if (touchesRoad) score += 0.5
+        // barrio: cerca de mismo tipo
+        let sameNearby=0, crossNearby=0
+        for(let dy2=-4; dy2<=4; dy2++) for(let dx2=-4; dx2<=4; dx2++){
+          const c2=city.getCell(x+dx2, y+dy2)
+          if(!c2||!c2.isOrigin||c2.owner!==player.id) continue
+          if(c2.buildingId===buildingId) sameNearby++
+          if(isResidential && ['commercial','shop','supermarket'].includes(c2.buildingId)) crossNearby++
+          if(isCommercial && ['residential','residential_small'].includes(c2.buildingId)) crossNearby++
+        }
+        score += Math.min(2, sameNearby*0.6)
+        score += Math.min(1.5, crossNearby*0.5)
+        // compacto cerca de base pero no encima
+        const dBase = Math.abs(x-player.x)+Math.abs(y-player.y)
+        if (dBase < 12) score += 1
+        if (dBase > 22) score -= 1
+        candidates.push({x,y,score})
+      }
+    }
+    if (!candidates.length) return null
+    candidates.sort((a,b)=>b.score-a.score)
+    return candidates[0]
   }
 
   function chooseBuildingFor(player) {
     const s = statsFor(player.id)
     const myMoney = single.getMoney(player.id)
+    const elapsed = single.startedAt ? (Date.now() - single.startedAt)/1000 : 999
+    const hasSchool = city.flatGrid.some(c=>c.isOrigin && c.owner===player.id && (c.buildingId==='school'||c.buildingId==='university'))
+    const hasUni = city.flatGrid.some(c=>c.isOrigin && c.owner===player.id && c.buildingId==='university')
+    // 1. ECONOMÍA — déficit energético/hídrico tiene prioridad absoluta
+    if (s.hasEnergyDeficit && s.energyP < s.energyC) {
+      if (myMoney >= 300 && single.canAfford(player.id, BUILDING_TYPES.power.cost) && Math.random()<0.75) return 'power'
+      if (myMoney >= 620 && single.canAfford(player.id, BUILDING_TYPES.solar_farm.cost) && Math.random()<0.6) return 'solar_farm'
+      if (myMoney >= 1800 && single.canAfford(player.id, BUILDING_TYPES.nuclear_plant.cost) && Math.random()<0.35) return 'nuclear_plant'
+      if (myMoney >= 180 && single.canAfford(player.id, BUILDING_TYPES.wind_turbine.cost) && Math.random()<0.5) return 'wind_turbine'
+    }
+    if (s.hasWaterDeficit && s.waterP < s.waterC) {
+      if (myMoney >= 250 && single.canAfford(player.id, BUILDING_TYPES.waterPlant.cost) && Math.random()<0.7) return 'waterPlant'
+      if (myMoney >= 380 && single.canAfford(player.id, BUILDING_TYPES.sewage_plant.cost) && Math.random()<0.5) return 'sewage_plant'
+    }
+    // 2. RUSH TECH 0-3min — escuela/universidad antes que arsenal/data/antena
+    if (elapsed < 180 && !hasSchool && myMoney >= BUILDING_TYPES.school.cost && Math.random()<0.85) return 'school'
+    if (elapsed < 240 && hasSchool && !hasUni && myMoney >= BUILDING_TYPES.university.cost && Math.random()<0.65) return 'university'
+    if (!hasSchool && !hasUni && myMoney >= BUILDING_TYPES.school.cost && Math.random()<0.4) return 'school'
     const human = single.players.find(p=>p.isHuman)
     // 6. AHORRO INTELIGENTE — guarda para nuclear/opera si va ganando
     if (human) {
@@ -121,10 +220,14 @@ export function useSingleAI() {
     }
     const hasRoad = city.flatGrid.some(c=>c.owner===player.id && (c.hasRoad || ['road','dirt_road','concrete_road'].includes(c.buildingId)))
     if (!hasRoad) return 'road'
-    // Defensa 12% si tiene power/nuclear/city_hall
-    if (Math.random()<0.12) {
-      const hasImportant = city.flatGrid.some(c=>c.owner===player.id && ['power','nuclear_plant','city_hall'].includes(c.buildingId))
-      if (hasImportant) return ['wall','brick_wall','hedge'][Math.floor(Math.random()*3)]
+    // Defensa 25% — amuralla power/nuclear/city_hall/arsenal/data/telecom con anillo + gate
+    if (Math.random()<0.25) {
+      const hasImportant = city.flatGrid.some(c=>c.owner===player.id && ['power','nuclear_plant','city_hall','arsenal','data_center','telecom_tower','museum'].includes(c.buildingId))
+      if (hasImportant) {
+        // 30% gate para entrada, resto muro/brick
+        if (Math.random()<0.3) return 'gate'
+        return ['wall','brick_wall','hedge','metal_fence'][Math.floor(Math.random()*4)]
+      }
     }
     if (s.pop < 26 && Math.random()<0.38) return ['residential','residential_small','apartment_block'][Math.floor(Math.random()*3)]
     if (s.income < 14 && Math.random()<0.3) return ['supermarket','mall','factory'][Math.floor(Math.random()*3)]
@@ -163,6 +266,12 @@ export function useSingleAI() {
     const bId = chooseBuildingFor(player)
     const b = BUILDING_TYPES[bId]
     if (!b) return
+    // Árbol tech para CPU: arsenal/data/antena requieren escuela/universidad
+    const gated = new Set(['arsenal','data_center','telecom_tower'])
+    if (gated.has(bId)) {
+      const hasSchool = city.flatGrid.some(c=>c.isOrigin && (c.buildingId==='school'||c.buildingId==='university') && c.owner===player.id)
+      if (!hasSchool) return
+    }
     if (!single.canAfford(player.id, b.cost)) return
     const w = b.width||1, h=b.height||1
     const isRoad = ['road','dirt_road','concrete_road'].includes(bId)
@@ -201,9 +310,24 @@ export function useSingleAI() {
       const v = ['straight-h','straight-v','curve-nw','cross'][Math.floor(Math.random()*4)]
       city.selectedWallVariant = v
     }
-    for (let tries=0; tries<18; tries++) {
-      const dx = Math.floor(Math.random()*22)-11
-      const dy = Math.floor(Math.random()*22)-11
+    // Intenta hueco inteligente (barrio + carretera) antes que random puro
+    const best = findBestBuildingSpot(player, bId)
+    if (best) {
+      const { x, y } = best
+      if (!buildQueue.findAt(x,y)) {
+        const ok = canPlaceAt(city.grid, x, y, bId, 999999)
+        if (ok.ok) {
+          single.deduct(player.id, b.cost)
+          const dur = buildQueue.durationFor(bId)
+          if (dur===0) city.forcePlaceBuilding(x,y,bId, player.id)
+          else buildQueue.queue.value.push({ id: Date.now()+Math.random(), x, y, buildingId: bId, owner: player.id, progress: 0, duration: dur, w, h, startedAt: Date.now() })
+          return
+        }
+      }
+    }
+    for (let tries=0; tries<12; tries++) {
+      const dx = Math.floor(Math.random()*18)-9
+      const dy = Math.floor(Math.random()*18)-9
       const x = player.x + dx
       const y = player.y + dy
       const ok = canPlaceAt(city.grid, x, y, bId, 999999)
@@ -302,6 +426,10 @@ export function useSingleAI() {
   function trySpecialWeapon(player) {
     const myMoney = single.getMoney(player.id)
     if (myMoney < 50) return
+    // Requiere tech: arsenal + escuela/universidad, si no, no dispara especiales
+    const hasArs = city.flatGrid.some(c=>c.isOrigin && c.buildingId==='arsenal' && c.owner===player.id)
+    const hasSchool = city.flatGrid.some(c=>c.isOrigin && (c.buildingId==='school'||c.buildingId==='university') && c.owner===player.id)
+    if (!hasArs || !hasSchool) return
     // 9. ESPECIALES — usa 🚀 rocket/misil y ☢️ atómica vía mapa cuando detecta city_hall/bank
     const highValue = city.flatGrid.filter(c => c.isOrigin && c.owner && c.owner !== player.id && c.buildingId && ['city_hall','bank','nuclear_plant','power','financial_district','opera','castle'].includes(c.buildingId))
     if (!highValue.length) {

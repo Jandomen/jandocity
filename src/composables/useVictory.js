@@ -19,9 +19,9 @@ export function useVictory() {
 
   function check() {
     if (!single.isActive) return null
-    // 30 min de gracia como pediste: no calcula victoria hasta entonces
+    // 3 min de gracia: evita victoria instantánea por spawn, pero permite win temprano tras arrasar
     const elapsed = single.startedAt ? (Date.now() - single.startedAt) / 1000 : 0
-    if (elapsed < 1800) return null // 30*60
+    if (elapsed < 180) return null // 3*60
     // no hay derrota hasta que hayas construido algo por primera vez
     if (!single.hasEverBuilt) return null
     // registra quién ha estado vivo alguna vez (para no dar victoria instantánea)

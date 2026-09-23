@@ -13,6 +13,16 @@ const unitQueue = useUnitQueue()
 function triggerRemote(weaponId) {
   const w = WEAPONS.find(x=>x.id===weaponId)
   if (!w) return
+  // En Un Jugador exige Escuela/Universidad + Arsenal — evita que cohetes/atómicas estén disponibles desde el inicio
+  if (single.isActive && (!hasArs.value || !hasEdu.value)) {
+    if (!hasEdu.value) city.logs.unshift(`[Remoto] 🔒 Requiere Escuela o Universidad para ${w.label}`)
+    else city.logs.unshift(`[Remoto] 🔒 Requiere Arsenal 3×3 para desbloquear ${w.label}`)
+    return
+  }
+  if (weaponId==='atomic_heavy' && single.isActive && !hasUni.value) {
+    city.logs.unshift(`[Remoto] 🔒 Atómica pesada requiere Universidad`)
+    return
+  }
   const cost = w.priceMX
   // cheapest check: city.money may be number
   if (city.money < cost) {
@@ -28,33 +38,36 @@ const remoteWeapons = computed(() => WEAPONS.filter(w=>w.remote))
 const hasPolice = computed(() => city.flatGrid.some(c=>c.isOrigin && c.buildingId==='police_station' && c.owner===single.humanPlayer()?.id))
 const hasMil = computed(() => city.flatGrid.some(c=>c.isOrigin && c.buildingId==='military_academy' && c.owner===single.humanPlayer()?.id))
 const hasArs = computed(() => city.flatGrid.some(c=>c.isOrigin && c.buildingId==='arsenal' && c.owner===single.humanPlayer()?.id))
+const hasSchool = computed(() => city.flatGrid.some(c=>c.isOrigin && c.buildingId==='school' && c.owner===single.humanPlayer()?.id))
+const hasUni = computed(() => city.flatGrid.some(c=>c.isOrigin && c.buildingId==='university' && c.owner===single.humanPlayer()?.id))
+const hasEdu = computed(() => hasSchool.value || hasUni.value)
 const hasResidential = computed(() => city.flatGrid.some(c=>c.isOrigin && ['residential','residential_small','residential_medium','residential_large'].includes(c.buildingId) && c.owner===single.humanPlayer()?.id))
 const hasCityHall = computed(() => city.flatGrid.some(c=>c.isOrigin && c.buildingId==='city_hall' && c.owner===single.humanPlayer()?.id))
 const hasMuseum = computed(() => city.flatGrid.some(c=>c.isOrigin && c.buildingId==='museum' && c.owner===single.humanPlayer()?.id))
 const hasPower = computed(() => city.flatGrid.some(c=>c.isOrigin && c.buildingId==='power' && c.owner===single.humanPlayer()?.id))
 const hasRoadBuilt = computed(() => city.flatGrid.some(c=> (c.hasRoad || ['road','dirt_road','concrete_road','cobble_road'].includes(c.buildingId)) && c.owner===single.humanPlayer()?.id))
 
-// estado colapsable por categoría (como carreteras, todas organizadas igual)
+// estado colapsable por categoría — inicia cerrado "-" → "+" (usuario abre)
 const open = ref({
-  zonas: true,
-  altura: true,
-  grandes: true,
-  mega: true,
-  servicios: true,
-  publica: true,
-  produccion: true,
-  remoto: true,
-  cultura: true,
-  mundial: true,
-  banderas: true,
-  vehiculos: true,
-  infra: true,
-  transporte: true,
-  terreno: true,
-  cercas: true,
-  costa: true,
-  naturaleza: true,
-  utils: true,
+  zonas: false,
+  altura: false,
+  grandes: false,
+  mega: false,
+  servicios: false,
+  publica: false,
+  produccion: false,
+  remoto: false,
+  cultura: false,
+  mundial: false,
+  banderas: false,
+  vehiculos: false,
+  infra: false,
+  transporte: false,
+  terreno: false,
+  cercas: false,
+  costa: false,
+  naturaleza: false,
+  utils: false,
 })
 
 function toggle(cat) { open.value[cat] = !open.value[cat] }
@@ -187,7 +200,7 @@ function btnBase(selected, color) {
         <button
           v-for="tool in [
             { id: 'stadium', label: 'Estadio', icon: '🏟️', cost: BUILDINGS.stadium.cost, sub: '3×3' },
-            { id: 'airport', label: 'Aeropuerto', icon: '✈️', cost: BUILDINGS.airport.cost, sub: '4×3' },
+            { id: 'airport', label: 'Aeropuerto', icon: '✈️', cost: BUILDINGS.airport.cost, sub: '6×6' },
           ]"
           :key="tool.id"
           @click="city.selectedTool = tool.id"
@@ -217,7 +230,7 @@ function btnBase(selected, color) {
             { id: 'opera', label: 'Ópera', icon: '🎭', cost: BUILDINGS.opera.cost, sub: '3×3' },
             { id: 'olympic_stadium', label: 'Olímpico', icon: '🏟️', cost: BUILDINGS.olympic_stadium.cost, sub: '5×5' },
             { id: 'nuclear_plant', label: 'Nuclear', icon: '☢️', cost: BUILDINGS.nuclear_plant.cost, sub: '4×4 +55⚡' },
-            { id: 'intl_airport', label: 'Intl. Airport', icon: '✈️', cost: BUILDINGS.intl_airport.cost, sub: '5×3' },
+            { id: 'intl_airport', label: 'Intl. Airport', icon: '✈️', cost: BUILDINGS.intl_airport.cost, sub: '6×12' },
             { id: 'library', label: 'Biblioteca', icon: '📚', cost: BUILDINGS.library.cost, sub: '3×2' },
             { id: 'convention_center', label: 'Convenciones', icon: '🏢', cost: BUILDINGS.convention_center.cost, sub: '4×3' },
           ]"
@@ -260,7 +273,7 @@ function btnBase(selected, color) {
     <!-- 2c. SEGURIDAD / SALUD / JUSTICIA + Colegio Militar -->
     <section class="bg-slate-900/60 rounded-lg border border-slate-700/50 overflow-hidden">
       <button @click="toggle('publica')" class="w-full flex items-center justify-between px-3 py-2 bg-slate-700/40 hover:bg-slate-700/60 transition-colors">
-        <span class="flex items-center gap-2 text-xs font-bold tracking-wider text-slate-200"><span>🏛️</span> PÚBLICA — Policía/Bomberos/Salud/Justicia/Militar <span class="text-slate-400 font-normal">7 edificios</span></span>
+        <span class="flex items-center gap-2 text-xs font-bold tracking-wider text-slate-200"><span>🏛️</span> PÚBLICA — Policía/Bomberos/Salud/Justicia/Militar <span class="text-slate-400 font-normal">10 edificios</span></span>
         <span class="text-slate-200 text-xs">{{ open.publica ? '−' : '+' }}</span>
       </button>
       <div v-show="open.publica" class="p-2 grid grid-cols-2 gap-1.5">
@@ -269,9 +282,12 @@ function btnBase(selected, color) {
             { id: 'police_station', label: 'Comisaría', icon: '🚔', cost: BUILDINGS.police_station.cost, sub: '2×2' },
             { id: 'fire_station', label: 'Bomberos', icon: '🚒', cost: BUILDINGS.fire_station.cost, sub: '2×2' },
             { id: 'hospital', label: 'Hospital', icon: '🏥', cost: BUILDINGS.hospital.cost, sub: '3×2' },
+            { id: 'clinic', label: 'Clínica', icon: '🩺', cost: BUILDINGS.clinic.cost, sub: '1×1 · +9💰' },
+            { id: 'medical_uni', label: 'Uni Médica', icon: '⚕️', cost: BUILDINGS.medical_uni.cost, sub: '3×3 · +16💰' },
             { id: 'gym', label: 'Gimnasio', icon: '🏋️', cost: BUILDINGS.gym.cost, sub: '2×2' },
             { id: 'courthouse', label: 'Juzgado', icon: '⚖️', cost: BUILDINGS.courthouse.cost, sub: '2×2' },
             { id: 'prison', label: 'Cárcel', icon: '🔒', cost: BUILDINGS.prison.cost, sub: '3×3' },
+            { id: 'bunker', label: 'Búnker', icon: '🛡️', cost: BUILDINGS.bunker.cost, sub: '2×2 · defensa' },
             { id: 'military_academy', label: 'Colegio Militar', icon: '🪖', cost: BUILDINGS.military_academy.cost, sub: '3×3 soldados' },
           ]"
           :key="tool.id"
@@ -358,19 +374,24 @@ function btnBase(selected, color) {
         <span class="flex items-center gap-2 text-xs font-bold tracking-wider text-red-300"><span>🚀</span> ATAQUE REMOTO — vía mapa <span class="text-red-500/60 font-normal">4 armas</span></span>
         <span class="text-red-300 text-xs">{{ open.remoto ? '−' : '+' }}</span>
       </button>
-      <div v-show="open.remoto" class="p-2 space-y-2">
+      <div v-if="single.isActive && (!hasArs || !hasEdu)" v-show="open.remoto" class="p-3 text-center text-[11px] text-white/40">
+        <span v-if="!hasEdu">🎓 Construye <b class="text-white">Escuela o Universidad</b> primero</span>
+        <span v-else>💣 Construye <b class="text-white">Arsenal 3×3</b> para desbloquear cohetes y atómicas</span>
+        — no disponibles al inicio
+      </div>
+      <div v-else v-show="open.remoto" class="p-2 space-y-2">
         <p class="text-[10px] text-white/50 leading-tight">Se abre el mapa: tocas dónde atacar. {{ city.pendingRemoteWeapon ? `Seleccionado: ${WEAPONS.find(w=>w.id===city.pendingRemoteWeapon)?.label}` : 'Elige un arma' }}</p>
         <div class="grid grid-cols-2 gap-1.5">
-          <button @click="triggerRemote('rocket')" class="p-2 rounded border flex flex-col items-center gap-0.5" :class="city.pendingRemoteWeapon==='rocket' ? 'bg-red-600 border-white text-white ring-1 ring-white' : 'bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700'">
+          <button @click="triggerRemote('rocket')" :disabled="single.isActive && (!hasArs || !hasEdu)" class="p-2 rounded border flex flex-col items-center gap-0.5" :class="[(city.pendingRemoteWeapon==='rocket' ? 'bg-red-600 border-white text-white ring-1 ring-white' : 'bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700'), single.isActive && (!hasArs || !hasEdu) ? 'opacity-40 pointer-events-none' : '']">
             <span class="text-base">🚀</span><span class="text-[10px] font-semibold">Cohete</span><span class="text-[9px] opacity-60">3x3 • $50</span>
           </button>
-          <button @click="triggerRemote('missile')" class="p-2 rounded border flex flex-col items-center gap-0.5" :class="city.pendingRemoteWeapon==='missile' ? 'bg-red-600 border-white text-white ring-1 ring-white' : 'bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700'">
+          <button @click="triggerRemote('missile')" :disabled="single.isActive && (!hasArs || !hasEdu)" class="p-2 rounded border flex flex-col items-center gap-0.5" :class="[(city.pendingRemoteWeapon==='missile' ? 'bg-red-600 border-white text-white ring-1 ring-white' : 'bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700'), single.isActive && (!hasArs || !hasEdu) ? 'opacity-40 pointer-events-none' : '']">
             <span class="text-base">🚀</span><span class="text-[10px] font-semibold">Misil</span><span class="text-[9px] opacity-60">5x5 • $200</span>
           </button>
-          <button @click="triggerRemote('atomic')" class="p-2 rounded border flex flex-col items-center gap-0.5" :class="city.pendingRemoteWeapon==='atomic' ? 'bg-amber-600 border-white text-white ring-1 ring-white' : 'bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700'">
+          <button @click="triggerRemote('atomic')" :disabled="single.isActive && (!hasArs || !hasEdu)" class="p-2 rounded border flex flex-col items-center gap-0.5" :class="[(city.pendingRemoteWeapon==='atomic' ? 'bg-amber-600 border-white text-white ring-1 ring-white' : 'bg-slate-800 border-slate-700 text-white/70 hover:bg-slate-700'), single.isActive && (!hasArs || !hasEdu) ? 'opacity-40 pointer-events-none' : '']">
             <span class="text-base">☢️</span><span class="text-[10px] font-semibold">Atómica</span><span class="text-[9px] opacity-60">7x7 • $500</span>
           </button>
-          <button @click="triggerRemote('atomic_heavy')" class="p-2 rounded border flex flex-col items-center gap-0.5" :class="city.pendingRemoteWeapon==='atomic_heavy' ? 'bg-zinc-800 border-amber-400 text-amber-300 ring-1 ring-amber-400' : 'bg-amber-900/30 border-amber-500 text-amber-300 hover:bg-amber-900/40'">
+          <button @click="triggerRemote('atomic_heavy')" :disabled="single.isActive && (!hasArs || !hasUni)" class="p-2 rounded border flex flex-col items-center gap-0.5" :class="[(city.pendingRemoteWeapon==='atomic_heavy' ? 'bg-zinc-800 border-amber-400 text-amber-300 ring-1 ring-amber-400' : 'bg-amber-900/30 border-amber-500 text-amber-300 hover:bg-amber-900/40'), single.isActive && (!hasArs || !hasUni) ? 'opacity-40 pointer-events-none' : '']">
             <span class="text-base">💥</span><span class="text-[10px] font-semibold">Atómica Pesada</span><span class="text-[9px] opacity-60">11x11 • $850</span>
           </button>
         </div>
@@ -382,7 +403,7 @@ function btnBase(selected, color) {
     <!-- 2d. CULTURA / MONUMENTOS / INFRA -->
     <section class="bg-slate-900/60 rounded-lg border border-slate-700/50 overflow-hidden">
       <button @click="toggle('cultura')" class="w-full flex items-center justify-between px-3 py-2 bg-amber-900/20 hover:bg-amber-900/30 transition-colors">
-        <span class="flex items-center gap-2 text-xs font-bold tracking-wider text-amber-300"><span>🏛️</span> CULTURA — Iglesias/Castillos/Monumentos <span class="text-amber-500/60 font-normal">11 edificios</span></span>
+        <span class="flex items-center gap-2 text-xs font-bold tracking-wider text-amber-300"><span>🏛️</span> CULTURA — Iglesias/Castillos/Monumentos <span class="text-amber-500/60 font-normal">14 edificios</span></span>
         <span class="text-amber-300 text-xs">{{ open.cultura ? '−' : '+' }}</span>
       </button>
       <div v-show="open.cultura" class="p-2 grid grid-cols-2 gap-1.5">
@@ -397,6 +418,9 @@ function btnBase(selected, color) {
             { id: 'memorial', label: 'Memorial', icon: '🪦', cost: BUILDINGS.memorial.cost, sub: '2×2' },
             { id: 'fountain', label: 'Fuente', icon: '⛲', cost: BUILDINGS.fountain.cost, sub: '2×2' },
             { id: 'lighthouse', label: 'Faro', icon: '🗼', cost: BUILDINGS.lighthouse.cost, sub: '1×2' },
+            { id: 'cinema', label: 'Cine', icon: '🎬', cost: BUILDINGS.cinema.cost, sub: '2×1 · +17💰' },
+            { id: 'theme_park', label: 'Parque temático', icon: '🎢', cost: BUILDINGS.theme_park.cost, sub: '4×4 · +42💰' },
+            { id: 'zoo', label: 'Zoológico', icon: '🦁', cost: BUILDINGS.zoo.cost, sub: '3×3 · +20💰' },
             { id: 'dam', label: 'Presa', icon: '🌊', cost: BUILDINGS.dam.cost, sub: '3×1' },
             { id: 'wind_turbine', label: 'Eólica', icon: '🌬️', cost: BUILDINGS.wind_turbine.cost, sub: '1×1' },
           ]"
@@ -490,7 +514,7 @@ function btnBase(selected, color) {
     <!-- 3. INFRAESTRUCTURA -->
     <section class="bg-slate-900/60 rounded-lg border border-slate-700/50 overflow-hidden">
       <button @click="toggle('infra')" class="w-full flex items-center justify-between px-3 py-2 bg-amber-900/20 hover:bg-amber-900/30 transition-colors">
-        <span class="flex items-center gap-2 text-xs font-bold tracking-wider text-amber-300"><span>⚡</span> INFRA — Energía/Agua/Industria <span class="text-amber-500/60 font-normal">8 edificios</span></span>
+        <span class="flex items-center gap-2 text-xs font-bold tracking-wider text-amber-300"><span>⚡</span> INFRA — Energía/Agua/Industria <span class="text-amber-500/60 font-normal">12 edificios</span></span>
         <span class="text-amber-300 text-xs">{{ open.infra ? '−' : '+' }}</span>
       </button>
       <div v-show="open.infra" class="p-2 grid grid-cols-2 gap-1.5">
@@ -503,15 +527,19 @@ function btnBase(selected, color) {
             { id: 'warehouse', label: 'Almacén', icon: '🏚️', cost: BUILDINGS.warehouse.cost, sub: '2×2' },
             { id: 'telecom_tower', label: 'Antena', icon: '📡', cost: BUILDINGS.telecom_tower.cost, sub: '1×1' },
             { id: 'data_center', label: 'Data center', icon: '💾', cost: BUILDINGS.data_center.cost, sub: '2×2 · -14⚡' },
+            { id: 'lab', label: 'Laboratorio', icon: '🧪', cost: BUILDINGS.lab.cost, sub: '2×2 · +18💰' },
+            { id: 'observatory', label: 'Observatorio', icon: '🔭', cost: BUILDINGS.observatory.cost, sub: '2×2 · +14💰' },
+            { id: 'ai_center', label: 'Centro IA', icon: '🤖', cost: BUILDINGS.ai_center.cost, sub: '3×3 · +28💰' },
+            { id: 'radar_tower', label: 'Radar', icon: '📡', cost: BUILDINGS.radar_tower.cost, sub: '1×1 · +9💰' },
             { id: 'sewage_plant', label: 'Depuradora', icon: '🚿', cost: BUILDINGS.sewage_plant.cost, sub: '2×2 · +18💧' },
             { id: 'recycling_plant', label: 'Reciclaje', icon: '♻️', cost: BUILDINGS.recycling_plant.cost, sub: '+6 O₂' },
           ]"
           :key="tool.id"
-          @click="!(single.isActive && !hasPower && ['solar_farm','nuclear_plant'].includes(tool.id)) && (city.selectedTool = tool.id)"
+          @click="!(single.isActive && !hasPower && ['solar_farm','nuclear_plant'].includes(tool.id)) && !(single.isActive && !hasEdu && ['arsenal','data_center','telecom_tower'].includes(tool.id)) && (city.selectedTool = tool.id)"
           class="p-2 rounded border text-xs text-left"
           :class="[
             city.selectedTool===tool.id ? 'bg-amber-500/20 border-amber-500 text-amber-300 ring-1 ring-amber-500' : 'bg-slate-800 border-slate-700 text-white/70',
-            single.isActive && !hasPower && ['solar_farm','nuclear_plant'].includes(tool.id) ? 'opacity-40 pointer-events-none' : ''
+            (single.isActive && !hasPower && ['solar_farm','nuclear_plant'].includes(tool.id)) || (single.isActive && !hasEdu && ['arsenal','data_center','telecom_tower'].includes(tool.id)) ? 'opacity-40 pointer-events-none' : ''
           ]"
         >
           <div class="flex items-center gap-1.5"><span>{{ tool.icon }}</span><span class="font-semibold text-[11px]">{{ tool.label }}</span></div>
@@ -519,6 +547,7 @@ function btnBase(selected, color) {
           <div class="text-[10px] font-mono text-amber-400">${{ tool.cost }}</div>
         </button>
       </div>
+      <p v-if="single.isActive && !hasEdu" v-show="open.infra" class="px-2 pb-2 text-[10px] text-amber-300/70">🔒 Escuela o Universidad requerida para Arsenal / Data center / Antena</p>
     </section>
 
     <!-- 4. TRANSPORTE — CARRETERAS + RIELES -->
@@ -589,6 +618,10 @@ function btnBase(selected, color) {
         </div>
         <p v-if="city.selectedTool==='rail'" class="text-[9px] text-zinc-400 leading-tight">Rieles con curvas/T/cruz como carreteras — pon tren encima y circula solo.</p>
         <p v-if="city.selectedTool==='train'" class="text-[9px] text-zinc-400 leading-tight">Coloca el tren sobre rieles y avanza solo; al final se regresa.</p>
+        <div class="grid grid-cols-2 gap-1.5 mt-2">
+          <button @click="city.selectedTool='heliport'" class="p-2 rounded border flex flex-col items-center gap-0.5" :class="city.selectedTool==='heliport' ? 'bg-sky-600 border-white text-white ring-1 ring-white' : 'bg-slate-800 border-slate-700 text-white/70'"><span class="text-base">🚁</span><span class="text-[10px] font-semibold">Helipuerto</span><span class="text-[9px] font-mono">${{ BUILDINGS.heliport.cost }}</span></button>
+          <button @click="city.selectedTool='metro_entry'" class="p-2 rounded border flex flex-col items-center gap-0.5" :class="city.selectedTool==='metro_entry' ? 'bg-zinc-800 border-white text-white ring-1 ring-white' : 'bg-slate-800 border-slate-700 text-white/70'"><span class="text-base">🚇</span><span class="text-[10px] font-semibold">Metro</span><span class="text-[9px] font-mono">${{ BUILDINGS.metro_entry.cost }}</span></button>
+        </div>
       </div>
     </section>
 
@@ -744,6 +777,8 @@ function btnBase(selected, color) {
             { id: 'bush', label: 'Arbusto', icon: '🌿', cost: BUILDINGS.bush.cost, sub: '+2 O₂' },
             { id: 'flower', label: 'Flores', icon: '🌸', cost: BUILDINGS.flower.cost, sub: '+1 O₂' },
             { id: 'rock', label: 'Roca', icon: '🪨', cost: BUILDINGS.rock.cost, sub: '—' },
+            { id: 'nursery', label: 'Vivero', icon: '🌱', cost: BUILDINGS.nursery.cost, sub: '+8 O₂ · +7💰' },
+            { id: 'wetland', label: 'Humedal', icon: '🦆', cost: BUILDINGS.wetland.cost, sub: '+12 O₂ 3×2' },
           ]"
           :key="tool.id"
           @click="city.selectedTool = tool.id"

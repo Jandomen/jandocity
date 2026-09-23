@@ -121,7 +121,8 @@ export const ROAD_REQUIRED_BUILDINGS = [
   'church','cathedral','castle','stadium','airport',
   'city_hall','museum','port','solar_farm','financial_district','opera',
   'olympic_stadium','nuclear_plant','intl_airport',
-  'factory','warehouse','telecom_tower','data_center','sewage_plant','recycling_plant','library','convention_center'
+  'factory','warehouse','telecom_tower','data_center','sewage_plant','recycling_plant','library','convention_center',
+  'lab','observatory','ai_center','clinic','medical_uni','cinema','theme_park','zoo','nursery','wetland','bunker','radar_tower','heliport','metro_entry'
 ]
 
 export const WATER_REQUIRED_BUILDINGS = [

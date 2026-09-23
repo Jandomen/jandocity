@@ -274,6 +274,12 @@ function getValidation(cell) {
     }
     return { ok: true, reason: null }
   }
+  // Tech gate: arsenal/data/antena requieren escuela/universidad en Un Jugador
+  if (single.isActive && ['arsenal','data_center','telecom_tower'].includes(city.selectedTool)) {
+    const pid = single.humanPlayer()?.id
+    const hasEdu = city.flatGrid.some(c=>c.isOrigin && (c.buildingId==='school'||c.buildingId==='university') && c.owner===pid)
+    if (!hasEdu) return { ok: false, reason: '🔒 Requiere Escuela o Universidad' }
+  }
   // low: validación ligera sin isAdjacentToRoad/Water completo (evita canPlaceAt pesado en hover)
   if (isLow.value) {
     if (cell.buildingId || cell.occupiedBy) return { ok: false, reason: 'Casilla ocupada' }
@@ -317,31 +323,39 @@ async function handleCellClick(cell) {
     const ownVeh = vehAt && vehAt.owner === humanId
     if (ownPed) { selection.selectPed(pedAt.id, false); showAviso(`Seleccionado ${pedAt.kind} HP:${pedAt.hp||100}`); return }
     if (ownVeh) { selection.selectVeh(vehAt.id, false); showAviso(`Seleccionado ${vehAt.type} HP:${vehAt.hp||100}`); return }
-    if (selection.selected.value.length > 0) {
-      let targetInfo = null
-      if (pedAt && pedAt.owner !== humanId) targetInfo = { type: 'ped', id: pedAt.id, isEnemy: true }
-      else if (vehAt && vehAt.owner !== humanId) targetInfo = { type: 'veh', id: vehAt.id, isEnemy: true }
-      else {
-        let origin = cell
-        if (cell.isChild && cell.occupiedBy) origin = city.getCell(cell.occupiedBy.x, cell.occupiedBy.y) || cell
-        if (origin && origin.buildingId) {
-          const isEnemy = !origin.owner || origin.owner !== humanId
-          if (isEnemy) targetInfo = { type: 'building', id: origin.id, isEnemy: true, buildingId: origin.buildingId }
+    // Prioridad construcción: si hay herramienta activa, no interpretar el click como orden de movimiento.
+    // Evita la desincronización donde seleccionar forma de carretera + tener unidades seleccionadas
+    // hacía que el click se convirtiera en "Moviendo a (x,y)" en vez de encolar la carretera (1.5s cola).
+    if (city.selectedTool) {
+      if (selection.selected.value.length > 0) selection.clear()
+      // no return — deja que siga al flujo de construcción (cola 0-100%) abajo
+    } else {
+      if (selection.selected.value.length > 0) {
+        let targetInfo = null
+        if (pedAt && pedAt.owner !== humanId) targetInfo = { type: 'ped', id: pedAt.id, isEnemy: true }
+        else if (vehAt && vehAt.owner !== humanId) targetInfo = { type: 'veh', id: vehAt.id, isEnemy: true }
+        else {
+          let origin = cell
+          if (cell.isChild && cell.occupiedBy) origin = city.getCell(cell.occupiedBy.x, cell.occupiedBy.y) || cell
+          if (origin && origin.buildingId) {
+            const isEnemy = !origin.owner || origin.owner !== humanId
+            if (isEnemy) targetInfo = { type: 'building', id: origin.id, isEnemy: true, buildingId: origin.buildingId }
+          }
+        }
+        if (targetInfo && targetInfo.isEnemy && isMulti.value && isCoop.value && !multiSync.coopSettings.value.allowCombat) {
+          showAviso('⛔ Combate desactivado por host')
+          return
+        }
+        if (targetInfo || (!pedAt && !vehAt)) {
+          selection.commandTo(cell.x, cell.y, targetInfo)
+          showAviso(targetInfo ? `⚔️ Atacando ${targetInfo.type}` : `🏃 Moviendo a (${cell.x},${cell.y})`)
+          return
         }
       }
-      if (targetInfo && targetInfo.isEnemy && isMulti.value && isCoop.value && !multiSync.coopSettings.value.allowCombat) {
-        showAviso('⛔ Combate desactivado por host')
+      if (!city.selectedTool) {
+        if (selection.selected.value.length) selection.clear()
         return
       }
-      if (targetInfo || (!pedAt && !vehAt)) {
-        selection.commandTo(cell.x, cell.y, targetInfo)
-        showAviso(targetInfo ? `⚔️ Atacando ${targetInfo.type}` : `🏃 Moviendo a (${cell.x},${cell.y})`)
-        return
-      }
-    }
-    if (!city.selectedTool) {
-      if (selection.selected.value.length) selection.clear()
-      return
     }
   } else {
     if (!city.selectedTool) return
@@ -382,10 +396,16 @@ async function handleCellClick(cell) {
     if (!res.ok && res.reason) showAviso(`${res.reason} en (${cell.x},${cell.y})`)
     return
   }
-  // Un jugador: construcción con tiempo 0-100%
+  // Un jugador: construcción con tiempo 0-100% + árbol tech
   if (single.isActive || isMulti.value) {
     let effectiveTool = city.selectedTool
     if (effectiveTool === 'residential' && city.selectedHouseVariant !== 'residential') effectiveTool = city.selectedHouseVariant
+    // Tech gate: arsenal/data/antena requieren escuela/universidad
+    if (single.isActive && ['arsenal','data_center','telecom_tower'].includes(effectiveTool)) {
+      const pid = single.humanPlayer()?.id
+      const hasEdu = city.flatGrid.some(c=>c.isOrigin && (c.buildingId==='school'||c.buildingId==='university') && c.owner===pid)
+      if (!hasEdu) { showAviso('🔒 Requiere Escuela o Universidad para '+ (BUILDINGS[effectiveTool]?.label||effectiveTool)); return }
+    }
     const isCoopInstant = isMulti.value && isCoop.value
     const dur = isCoopInstant ? 0 : buildQueue.durationFor(effectiveTool)
     let ownerId = 'p0'
@@ -403,7 +423,11 @@ async function handleCellClick(cell) {
       const validation = canPlaceAt(city.grid, cell.x, cell.y, effectiveTool, city.money)
       if (!validation.ok) { showAviso(`${validation.reason} en (${cell.x},${cell.y})`); return }
       const added = buildQueue.add(cell.x, cell.y, effectiveTool, ownerId)
-      if (!added) { showAviso('Fondos insuficientes o ya en cola'); return }
+      if (!added) {
+        // si fue bloqueado por tech, add devuelve null
+        if (['arsenal','data_center','telecom_tower'].includes(effectiveTool)) { showAviso('🔒 Requiere Escuela/Universidad'); return }
+        showAviso('Fondos insuficientes o ya en cola'); return
+      }
       showAviso(`En construcción ${BUILDINGS[effectiveTool]?.label || effectiveTool} ${Math.round(added.progress)}%`)
       broadcastIfMulti(cell.x, cell.y, effectiveTool)
       return
@@ -441,6 +465,11 @@ async function handleCellEnter(cell) {
   if (single.isActive || isMulti.value) {
     let effectiveTool = city.selectedTool
     if (effectiveTool === 'residential' && city.selectedHouseVariant !== 'residential') effectiveTool = city.selectedHouseVariant
+    if (single.isActive && ['arsenal','data_center','telecom_tower'].includes(effectiveTool)) {
+      const pid = single.humanPlayer()?.id
+      const hasEdu = city.flatGrid.some(c=>c.isOrigin && (c.buildingId==='school'||c.buildingId==='university') && c.owner===pid)
+      if (!hasEdu) return
+    }
     const isCoopInstant = isMulti.value && isCoop.value
     const dur = isCoopInstant ? 0 : buildQueue.durationFor(effectiveTool)
     let ownerId = 'p0'

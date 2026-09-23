@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useCityStore } from '@/stores/cityStore.js'
 import { useTrafficStore } from '@/stores/trafficStore.js'
 import { useSinglePlayerStore } from '@/stores/singlePlayerStore.js'

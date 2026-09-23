@@ -4,6 +4,7 @@ import { useCityStore } from '@/stores/cityStore.js'
 import { useSinglePlayerStore } from '@/stores/singlePlayerStore.js'
 import { useUnitQueue } from '@/composables/useUnitQueue.js'
 import { BUILDINGS } from '@/constants/buildings.js'
+import { WEAPONS } from '@/config/weapons.js'
 import { usePerformance } from '@/composables/usePerformance.js'
 
 defineProps({ showUI: { type: Boolean, default: true } })
@@ -14,25 +15,29 @@ const unitQueue = useUnitQueue()
 const perf = usePerformance()
 const selected = ref(null)
 
-// algoritmo ligero: cachea hasPolice/Mil/Ars con throttle 1.5s para no escanear 22k celdas en cada render (abrir menú instantáneo)
+// algoritmo ligero: cachea hasPolice/Mil/Ars/Edu con throttle 1.5s para no escanear 22k celdas en cada render (abrir menú instantáneo)
 const hasPoliceCache = ref(false)
 const hasMilCache = ref(false)
 const hasArsCache = ref(false)
+const hasEduCache = ref(false)
+const hasUniCache = ref(false)
 function refreshUnlocks() {
   const tick = city.tickCount
   void tick
   const pid = single.humanPlayer()?.id
-  if (!pid) { hasPoliceCache.value=false; hasMilCache.value=false; hasArsCache.value=false; return }
+  if (!pid) { hasPoliceCache.value=false; hasMilCache.value=false; hasArsCache.value=false; hasEduCache.value=false; hasUniCache.value=false; return }
   // escaneo único O(n) cada 1.5s en vez de 3× por render
-  let p=false,m=false,a=false
+  let p=false,m=false,a=false,e=false,u=false
   for (const c of city.flatGrid) {
     if (!c.isOrigin || c.owner!==pid) continue
     if (!p && c.buildingId==='police_station') p=true
     if (!m && c.buildingId==='military_academy') m=true
     if (!a && c.buildingId==='arsenal') a=true
-    if (p&&m&&a) break
+    if (!e && (c.buildingId==='school'||c.buildingId==='university')) e=true
+    if (!u && c.buildingId==='university') u=true
+    if (p&&m&&a&&e&&u) break
   }
-  hasPoliceCache.value=p; hasMilCache.value=m; hasArsCache.value=a
+  hasPoliceCache.value=p; hasMilCache.value=m; hasArsCache.value=a; hasEduCache.value=e; hasUniCache.value=u
 }
 let refreshTimer=null
 onMounted(()=>{ refreshUnlocks(); refreshTimer=setInterval(refreshUnlocks,1500) })
@@ -42,6 +47,8 @@ watch(()=>selected.value, refreshUnlocks)
 const hasPolice = computed(()=> hasPoliceCache.value)
 const hasMil = computed(()=> hasMilCache.value)
 const hasArs = computed(()=> hasArsCache.value)
+const hasEdu = computed(()=> hasEduCache.value)
+const hasUni = computed(()=> hasUniCache.value)
 
 // items estáticos fuera del template para no recrear arrays en cada render (algoritmo O(1) render)
 const ZONAS_SMALL=[{id:'residential',label:'Normal',icon:'🏠',cost:BUILDINGS.residential.cost,sub:'1×1'},{id:'residential_small',label:'Pequeña',icon:'🏠',cost:BUILDINGS.residential_small.cost,sub:'8 hab'},{id:'residential_medium',label:'Mediana',icon:'🏡',cost:BUILDINGS.residential_medium.cost,sub:'14 hab'},{id:'residential_large',label:'Grande',icon:'🏘️',cost:BUILDINGS.residential_large.cost,sub:'28 hab 2×2'}]
@@ -92,6 +99,7 @@ const baseCategories = [
   { id: 'mega', label: 'Mega', icon: '🏛️' },
   { id: 'servicios', label: 'Servicios', icon: '🏨' },
   { id: 'publica', label: 'Pública', icon: '🚔' },
+  { id: 'remoto', label: 'Remoto', icon: '🚀' },
   { id: 'cultura', label: 'Cultura', icon: '⛪' },
   { id: 'banderas', label: 'Banderas', icon: '🏳️' },
   { id: 'mundial', label: 'Mundial', icon: '🌍' },
@@ -114,6 +122,25 @@ function close() { selected.value = null }
 function pick(toolId) {
   city.selectedTool = toolId
   // no cerrar automático para que usuario vea precio, pero modal tiene X abajo
+}
+function triggerRemoteMobile(weaponId) {
+  if (single.isActive && (!hasArs.value || !hasEdu.value)) {
+    if (!hasEdu.value) city.logs.unshift(`[Remoto] 🔒 Requiere Escuela/Universidad`)
+    else city.logs.unshift(`[Remoto] 🔒 Requiere Arsenal 3×3 para desbloquear`)
+    return
+  }
+  if (weaponId==='atomic_heavy' && single.isActive && !hasUni.value) {
+    city.logs.unshift(`[Remoto] 🔒 Atómica pesada requiere Universidad`)
+    return
+  }
+  const w = WEAPONS.find(x=>x.id===weaponId)
+  if (!w) return
+  if (city.money < w.priceMX) {
+    city.logs.unshift(`[Remoto] Fondos insuficientes para ${w.label} (${w.priceMX}💰)`)
+    return
+  }
+  city.pendingRemoteWeapon = weaponId
+  city.logs.unshift(`[Remoto] ${w.icon} ${w.label} listo — abre el mapa y toca dónde atacar`)
 }
 </script>
 
@@ -219,7 +246,7 @@ function pick(toolId) {
               <div class="grid grid-cols-2 gap-1.5">
                 <button v-for="tool in [
                   { id: 'stadium', label: 'Estadio', icon: '🏟️', cost: BUILDINGS.stadium.cost, sub: '3×3' },
-                  { id: 'airport', label: 'Aeropuerto', icon: '✈️', cost: BUILDINGS.airport.cost, sub: '4×3' },
+                  { id: 'airport', label: 'Aeropuerto', icon: '✈️', cost: BUILDINGS.airport.cost, sub: '6×6' },
                 ]" :key="tool.id" @click="pick(tool.id)" class="p-2 rounded border flex flex-col gap-1" :class="city.selectedTool===tool.id ? 'bg-violet-500/20 border-violet-500 text-violet-300 ring-1 ring-violet-500' : 'bg-slate-800 border-slate-700 text-white/70'">
                   <span class="text-lg">{{ tool.icon }}</span><span class="text-[11px] font-semibold">{{ tool.label }}</span><span class="text-[10px] font-mono text-violet-400">${{ tool.cost }}</span>
                 </button>
@@ -238,7 +265,7 @@ function pick(toolId) {
                   { id: 'opera', label: 'Ópera', icon: '🎭', cost: BUILDINGS.opera.cost, sub: '3×3' },
                   { id: 'olympic_stadium', label: 'Olímpico', icon: '🏟️', cost: BUILDINGS.olympic_stadium.cost, sub: '5×5' },
                   { id: 'nuclear_plant', label: 'Nuclear', icon: '☢️', cost: BUILDINGS.nuclear_plant.cost, sub: '+55⚡ 4×4' },
-                  { id: 'intl_airport', label: 'Intl. Airport', icon: '✈️', cost: BUILDINGS.intl_airport.cost, sub: '5×3' },
+                  { id: 'intl_airport', label: 'Intl. Airport', icon: '✈️', cost: BUILDINGS.intl_airport.cost, sub: '6×12' },
                   { id: 'library', label: 'Biblioteca', icon: '📚', cost: BUILDINGS.library.cost, sub: '3×2' },
                   { id: 'convention_center', label: 'Convenciones', icon: '🏢', cost: BUILDINGS.convention_center.cost, sub: '4×3' },
                 ]" :key="tool.id" @click="pick(tool.id)" class="p-2 rounded border flex flex-col gap-0.5" :class="city.selectedTool===tool.id ? 'bg-zinc-600 border-white text-white ring-1 ring-white' : 'bg-slate-800 border-slate-700 text-white/70'">
@@ -270,13 +297,39 @@ function pick(toolId) {
                   { id: 'police_station', label: 'Comisaría', icon: '🚔', cost: BUILDINGS.police_station.cost, sub: '2×2' },
                   { id: 'fire_station', label: 'Bomberos', icon: '🚒', cost: BUILDINGS.fire_station.cost, sub: '2×2' },
                   { id: 'hospital', label: 'Hospital', icon: '🏥', cost: BUILDINGS.hospital.cost, sub: '3×2' },
+                  { id: 'clinic', label: 'Clínica', icon: '🩺', cost: BUILDINGS.clinic.cost, sub: '1×1 +9💰' },
+                  { id: 'medical_uni', label: 'Uni Médica', icon: '⚕️', cost: BUILDINGS.medical_uni.cost, sub: '3×3 +16💰' },
                   { id: 'gym', label: 'Gimnasio', icon: '🏋️', cost: BUILDINGS.gym.cost, sub: '2×2' },
                   { id: 'courthouse', label: 'Juzgado', icon: '⚖️', cost: BUILDINGS.courthouse.cost, sub: '2×2' },
                   { id: 'prison', label: 'Cárcel', icon: '🔒', cost: BUILDINGS.prison.cost, sub: '3×3' },
+                  { id: 'bunker', label: 'Búnker', icon: '🛡️', cost: BUILDINGS.bunker.cost, sub: '2×2 defensa' },
                   { id: 'military_academy', label: 'Colegio Militar', icon: '🪖', cost: BUILDINGS.military_academy.cost, sub: '3×3 soldados' },
                 ]" :key="tool.id" @click="pick(tool.id)" class="p-2 rounded border flex flex-col gap-0.5" :class="city.selectedTool===tool.id ? 'bg-slate-600 border-white text-white ring-1 ring-white' : 'bg-slate-800 border-slate-700 text-white/70'">
                   <span class="text-base">{{ tool.icon }}</span><span class="text-[10px] font-semibold">{{ tool.label }}</span><span class="text-[8px] opacity-60">{{ tool.sub }}</span><span class="text-[9px] font-mono">${{ tool.cost }}</span>
                 </button>
+              </div>
+            </template>
+
+            <!-- REMOTO — bloqueado sin Arsenal+Edu en Un Jugador -->
+            <template v-else-if="selected==='remoto'">
+              <div v-if="single.isActive && (!hasArs || !hasEdu)" class="p-3 text-center text-[11px] text-white/40"><span v-if="!hasEdu">🎓 Construye <b class="text-white">Escuela o Universidad</b> primero</span><span v-else>💣 Construye <b class="text-white">Arsenal 3×3</b> para desbloquear</span></div>
+              <div v-else class="space-y-2">
+                <p class="text-[10px] text-white/50 leading-tight">Toca arma y luego el mapa para atacar</p>
+                <div class="grid grid-cols-2 gap-1.5">
+                  <button @click="triggerRemoteMobile('rocket')" class="p-2 rounded border flex flex-col items-center gap-0.5" :class="city.pendingRemoteWeapon==='rocket' ? 'bg-red-600 border-white text-white ring-1 ring-white' : 'bg-slate-800 border-slate-700 text-white/70'">
+                    <span class="text-base">🚀</span><span class="text-[10px] font-semibold">Cohete</span><span class="text-[9px] opacity-60">3x3 • $50</span>
+                  </button>
+                  <button @click="triggerRemoteMobile('missile')" class="p-2 rounded border flex flex-col items-center gap-0.5" :class="city.pendingRemoteWeapon==='missile' ? 'bg-red-600 border-white text-white ring-1 ring-white' : 'bg-slate-800 border-slate-700 text-white/70'">
+                    <span class="text-base">🚀</span><span class="text-[10px] font-semibold">Misil</span><span class="text-[9px] opacity-60">5x5 • $200</span>
+                  </button>
+                  <button @click="triggerRemoteMobile('atomic')" class="p-2 rounded border flex flex-col items-center gap-0.5" :class="city.pendingRemoteWeapon==='atomic' ? 'bg-amber-600 border-white text-white ring-1 ring-white' : 'bg-slate-800 border-slate-700 text-white/70'">
+                    <span class="text-base">☢️</span><span class="text-[10px] font-semibold">Atómica</span><span class="text-[9px] opacity-60">7x7 • $500</span>
+                  </button>
+                  <button @click="triggerRemoteMobile('atomic_heavy')" class="p-2 rounded border flex flex-col items-center gap-0.5" :class="city.pendingRemoteWeapon==='atomic_heavy' ? 'bg-zinc-800 border-amber-400 text-amber-300 ring-1 ring-amber-400' : 'bg-amber-900/30 border-amber-500 text-amber-300'">
+                    <span class="text-base">💥</span><span class="text-[10px] font-semibold">Pesada</span><span class="text-[9px] opacity-60">11x11 • $850</span>
+                  </button>
+                </div>
+                <button v-if="city.pendingRemoteWeapon" @click="city.pendingRemoteWeapon=null" class="w-full py-1.5 rounded border border-white/20 bg-white/10 text-white text-xs">✕ Cancelar</button>
               </div>
             </template>
 
@@ -293,6 +346,9 @@ function pick(toolId) {
                   { id: 'memorial', label: 'Memorial', icon: '🪦', cost: BUILDINGS.memorial.cost, sub: '2×2' },
                   { id: 'fountain', label: 'Fuente', icon: '⛲', cost: BUILDINGS.fountain.cost, sub: '2×2' },
                   { id: 'lighthouse', label: 'Faro', icon: '🗼', cost: BUILDINGS.lighthouse.cost, sub: '1×2' },
+                  { id: 'cinema', label: 'Cine', icon: '🎬', cost: BUILDINGS.cinema.cost, sub: '2×1 +17💰' },
+                  { id: 'theme_park', label: 'Temático', icon: '🎢', cost: BUILDINGS.theme_park.cost, sub: '4×4 +42💰' },
+                  { id: 'zoo', label: 'Zoológico', icon: '🦁', cost: BUILDINGS.zoo.cost, sub: '3×3 +20💰' },
                   { id: 'dam', label: 'Presa', icon: '🌊', cost: BUILDINGS.dam.cost, sub: '3×1' },
                   { id: 'wind_turbine', label: 'Eólica', icon: '🌬️', cost: BUILDINGS.wind_turbine.cost, sub: '1×1' },
                 ]" :key="tool.id" @click="pick(tool.id)" class="p-2 rounded border flex flex-col gap-0.5" :class="city.selectedTool===tool.id ? 'bg-amber-500/20 border-amber-500 text-amber-300 ring-1 ring-amber-500' : 'bg-slate-800 border-slate-700 text-white/70'">
@@ -367,12 +423,17 @@ function pick(toolId) {
                   { id: 'warehouse', label: 'Almacén', icon: '🏚️', cost: BUILDINGS.warehouse.cost, sub: '2×2' },
                   { id: 'telecom_tower', label: 'Antena', icon: '📡', cost: BUILDINGS.telecom_tower.cost, sub: '1×1' },
                   { id: 'data_center', label: 'Data center', icon: '💾', cost: BUILDINGS.data_center.cost, sub: '2×2 · -14⚡' },
+                  { id: 'lab', label: 'Laboratorio', icon: '🧪', cost: BUILDINGS.lab.cost, sub: '2×2 +18💰' },
+                  { id: 'observatory', label: 'Observatorio', icon: '🔭', cost: BUILDINGS.observatory.cost, sub: '2×2 +14💰' },
+                  { id: 'ai_center', label: 'Centro IA', icon: '🤖', cost: BUILDINGS.ai_center.cost, sub: '3×3 +28💰' },
+                  { id: 'radar_tower', label: 'Radar', icon: '📡', cost: BUILDINGS.radar_tower.cost, sub: '1×1 +9💰' },
                   { id: 'sewage_plant', label: 'Depuradora', icon: '🚿', cost: BUILDINGS.sewage_plant.cost, sub: '+18💧 2×2' },
                   { id: 'recycling_plant', label: 'Reciclaje', icon: '♻️', cost: BUILDINGS.recycling_plant.cost, sub: '+6 O₂' },
-                ]" :key="tool.id" @click="pick(tool.id)" class="p-2 rounded border text-xs text-left" :class="city.selectedTool===tool.id ? 'bg-amber-500/20 border-amber-500 text-amber-300 ring-1 ring-amber-500' : 'bg-slate-800 border-slate-700 text-white/70'">
+                ]" :key="tool.id" @click="!(single.isActive && !hasEdu && ['arsenal','data_center','telecom_tower'].includes(tool.id)) && pick(tool.id)" class="p-2 rounded border text-xs text-left" :class="[city.selectedTool===tool.id ? 'bg-amber-500/20 border-amber-500 text-amber-300 ring-1 ring-amber-500' : 'bg-slate-800 border-slate-700 text-white/70', single.isActive && !hasEdu && ['arsenal','data_center','telecom_tower'].includes(tool.id) ? 'opacity-40 pointer-events-none' : '']">
                   <div class="flex items-center gap-1.5"><span>{{ tool.icon }}</span><span class="font-semibold text-[11px]">{{ tool.label }}</span></div><div class="text-[9px] opacity-60">{{ tool.sub }}</div><div class="text-[10px] font-mono text-amber-400">${{ tool.cost }}</div>
                 </button>
               </div>
+              <p v-if="single.isActive && !hasEdu" class="text-[10px] text-amber-300/70 mt-2">🔒 Escuela o Universidad requerida para Arsenal / Data / Antena</p>
             </template>
 
             <!-- TRANSPORTE -->
@@ -397,6 +458,10 @@ function pick(toolId) {
               </div>
               <div v-if="['rail','train'].includes(city.selectedTool)" class="grid grid-cols-4 gap-1 mt-1">
                 <button v-for="v in roadVariants" :key="'rail-'+v.id" @click="city.selectedRailVariant=v.id" class="p-1.5 rounded border text-xs" :class="city.selectedRailVariant===v.id ? 'bg-stone-600 border-white text-white' : 'bg-slate-800 border-slate-700 text-white/60'"><div class="text-sm leading-none">{{ v.icon }}</div><div class="text-[8px] leading-tight mt-0.5">{{ v.label }}</div></button>
+              </div>
+              <div class="grid grid-cols-2 gap-1.5 mt-2">
+                <button @click="pick('heliport')" class="p-2 rounded border flex flex-col items-center gap-0.5" :class="city.selectedTool==='heliport' ? 'bg-sky-600 border-white text-white ring-1 ring-white' : 'bg-slate-800 border-slate-700 text-white/70'"><span class="text-base">🚁</span><span class="text-[10px] font-semibold">Helipuerto</span><span class="text-[9px] font-mono">${{ BUILDINGS.heliport.cost }}</span></button>
+                <button @click="pick('metro_entry')" class="p-2 rounded border flex flex-col items-center gap-0.5" :class="city.selectedTool==='metro_entry' ? 'bg-zinc-800 border-white text-white ring-1 ring-white' : 'bg-slate-800 border-slate-700 text-white/70'"><span class="text-base">🚇</span><span class="text-[10px] font-semibold">Metro</span><span class="text-[9px] font-mono">${{ BUILDINGS.metro_entry.cost }}</span></button>
               </div>
             </template>
 
@@ -500,6 +565,8 @@ function pick(toolId) {
                   { id: 'bush', label: 'Arbusto', icon: '🌿', cost: BUILDINGS.bush.cost, sub: '+2 O₂' },
                   { id: 'flower', label: 'Flores', icon: '🌸', cost: BUILDINGS.flower.cost, sub: '+1 O₂' },
                   { id: 'rock', label: 'Roca', icon: '🪨', cost: BUILDINGS.rock.cost, sub: '—' },
+                  { id: 'nursery', label: 'Vivero', icon: '🌱', cost: BUILDINGS.nursery.cost, sub: '+8 O₂' },
+                  { id: 'wetland', label: 'Humedal', icon: '🦆', cost: BUILDINGS.wetland.cost, sub: '+12 O₂' },
                 ]" :key="tool.id" @click="pick(tool.id)" class="p-1.5 rounded border flex flex-col items-center gap-0.5" :class="city.selectedTool===tool.id ? 'bg-green-500/20 border-green-500 text-green-300 ring-1 ring-green-500' : 'bg-slate-800 border-slate-700 text-white/70'">
                   <span class="text-sm">{{ tool.icon }}</span><span class="text-[9px] font-semibold">{{ tool.label }}</span><span class="text-[8px] opacity-60">{{ tool.sub }}</span><span class="text-[9px] font-mono text-green-400">${{ tool.cost }}</span>
                 </button>

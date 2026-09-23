@@ -163,6 +163,25 @@ export const useCityStore = defineStore('city', () => {
   }
   function flushSave() { clearTimeout(saveTimeout); try { saveGame(getSaveData()) } catch(e){} }
   function immediateSave() { try { saveGame(getSaveData()) } catch(e){} }
+  // Árbol tecnológico: school/university desbloquean arsenal/data_center/telecom_tower
+  const TECH_GATED = new Set(['arsenal','data_center','telecom_tower'])
+  function hasSchoolOrUni(ownerId) {
+    if (!ownerId) return flatGrid.value.some(c => c.isOrigin && (c.buildingId==='school'||c.buildingId==='university'))
+    return flatGrid.value.some(c => c.isOrigin && (c.buildingId==='school'||c.buildingId==='university') && c.owner===ownerId)
+  }
+  function checkTechGate(buildingId, ownerId) {
+    if (!TECH_GATED.has(buildingId)) return { ok: true }
+    // En libre (sin single) no bloquea — solo en Un Jugador / multi con owner
+    try {
+      const single = useSinglePlayerStore()
+      if (!single.isActive && !ownerId) return { ok: true }
+    } catch {}
+    if (!hasSchoolOrUni(ownerId)) {
+      return { ok: false, reason: '🔒 Requiere Escuela o Universidad para ' + (BUILDING_TYPES[buildingId]?.label || buildingId) }
+    }
+    return { ok: true }
+  }
+
   function log(msg) {
     logs.value.unshift(`[${new Date().toLocaleTimeString()}] ${msg}`)
     if (logs.value.length > 50) logs.value.pop()
@@ -318,6 +337,12 @@ export const useCityStore = defineStore('city', () => {
     if (!validation.ok) {
       return validation
     }
+    // Árbol tecnológico en Un Jugador
+    {
+      const ownerForTech = (()=>{ try{ const s=useSinglePlayerStore(); if(s.isActive) return s.humanPlayer()?.id||'p0'; }catch{} return null })()
+      const tech = checkTechGate(toolId, ownerForTech)
+      if (!tech.ok) return tech
+    }
 
     const building = BUILDING_TYPES[toolId]
     const w = building.width || 1
@@ -454,6 +479,10 @@ export const useCityStore = defineStore('city', () => {
     if (!cell) return { ok: false, reason: 'Coordenada fuera del mapa' }
     const validation = canPlaceAt(grid.value, x, y, toolId, money.value)
     if (!validation.ok) return validation
+    {
+      const tech = checkTechGate(toolId, owner)
+      if (!tech.ok) return tech
+    }
     const building = BUILDING_TYPES[toolId]
     const w = building.width || 1, h = building.height || 1
     money.value -= building.cost
@@ -637,6 +666,29 @@ export const useCityStore = defineStore('city', () => {
     const radius = REMOTE_RADIUS[weaponId] ?? 1
     const cost = REMOTE_COST[weaponId] ?? 50
     const damage = REMOTE_DAMAGE[weaponId] ?? 65
+    // En Un Jugador el humano exige Arsenal + Universidad para cohetes/atómicas
+    try {
+      const single = useSinglePlayerStore()
+      if (single.isActive) {
+        const humanId = single.humanPlayer()?.id || 'p0'
+        const isHumanStrike = !playerId || playerId === humanId || playerId === 'p0'
+        if (isHumanStrike) {
+          const hasArs = flatGrid.value.some(c => c.isOrigin && c.buildingId === 'arsenal' && c.owner === humanId)
+          const hasUni = flatGrid.value.some(c => c.isOrigin && (c.buildingId === 'university' || c.buildingId === 'school') && c.owner === humanId)
+          if (!hasArs) return { ok: false, reason: '🔒 Requiere Arsenal 3×3 para armas remotas' }
+          if (!hasUni) return { ok: false, reason: '🔒 Requiere Universidad/Escuela para armas remotas' }
+          // Atómicas pesada adicional: exige ambos
+          if (weaponId === 'atomic_heavy' && !flatGrid.value.some(c => c.isOrigin && c.buildingId === 'university' && c.owner === humanId)) {
+            return { ok: false, reason: '🔒 Atómica pesada requiere Universidad' }
+          }
+        } else {
+          // CPU también respeta árbol: arsenal+uni para especiales
+          const hasArs = flatGrid.value.some(c => c.isOrigin && c.buildingId === 'arsenal' && c.owner === playerId)
+          const hasUni = flatGrid.value.some(c => c.isOrigin && (c.buildingId === 'university' || c.buildingId === 'school') && c.owner === playerId)
+          if (!hasArs || !hasUni) return { ok: false, reason: 'CPU sin tech' }
+        }
+      }
+    } catch {}
     if (playerId) {
       const single = useSinglePlayerStore()
       if (!single.canAfford(playerId, cost)) return { ok: false, reason: `Fondos insuficientes (${cost}💰)` }
@@ -1189,6 +1241,7 @@ export const useCityStore = defineStore('city', () => {
     // actions
     getCell,
     selectTool,
+    expandGrid,
     placeBuilding,
     placeBuildingAt,
     forcePlaceBuilding,

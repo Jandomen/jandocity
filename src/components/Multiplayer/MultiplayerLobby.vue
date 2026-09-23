@@ -76,9 +76,19 @@ async function toggleReady() {
 function subscribe() {
   if (!room.value) return
   supabase.channel(`room-${room.value.id}`)
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${room.value.id}` }, payload => {
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${room.value.id}` }, async payload => {
       room.value = payload.new
       players.value = payload.new.players
+      // Sala persiste pública aunque se vaya el anfitrión — promueve al primero como nuevo host
+      if (payload.new.players.length > 0 && !payload.new.players.find(p=>p.id===payload.new.host_id)) {
+        const newHost = payload.new.players[0]
+        // solo el nuevo host hace el update para evitar carrera
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user && user.id === newHost.id) {
+          const updPlayers = payload.new.players.map((p,i)=> ({...p, isHost: i===0, ready: i===0 ? true : p.ready}))
+          await supabase.from('rooms').update({ host_id: newHost.id, players: updPlayers }).eq('id', payload.new.id)
+        }
+      }
       if (payload.new.status === 'starting') emit('start', payload.new)
     }).subscribe()
 }

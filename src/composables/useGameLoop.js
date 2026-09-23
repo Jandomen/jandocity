@@ -15,6 +15,7 @@ export function useGameLoop(tickCallback, options = {}) {
   const isRunning = ref(false)
   const isPaused = ref(false)
   let intervalId = null
+  let visHandler = null
 
   function start() {
     if (isRunning.value) return
@@ -25,10 +26,8 @@ export function useGameLoop(tickCallback, options = {}) {
       if (!isPaused.value) tickCallback()
     }, interval)
     // pausa automática en background (ahorro batería Android gama baja)
-    const vis = () => { if (document.visibilityState === 'hidden') isPaused.value = true; else if (isRunning.value) isPaused.value = false }
-    document.addEventListener('visibilitychange', vis)
-    // cleanup se hace en stop
-    intervalId._vis = vis
+    visHandler = () => { if (document.visibilityState === 'hidden') isPaused.value = true; else if (isRunning.value) isPaused.value = false }
+    document.addEventListener('visibilitychange', visHandler)
   }
 
   function pause() {
@@ -45,8 +44,11 @@ export function useGameLoop(tickCallback, options = {}) {
 
   function stop() {
     if (intervalId) {
-      if (intervalId._vis) document.removeEventListener('visibilitychange', intervalId._vis)
       clearInterval(intervalId)
+    }
+    if (visHandler) {
+      document.removeEventListener('visibilitychange', visHandler)
+      visHandler = null
     }
     intervalId = null
     isRunning.value = false

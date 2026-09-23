@@ -28,6 +28,16 @@ export function useBuildQueue() {
   function add(x, y, buildingId, owner = 'p0') {
     const b = BUILDING_TYPES[buildingId]
     if (!b) return null
+    const TECH_GATED = new Set(['arsenal','data_center','telecom_tower'])
+    if (TECH_GATED.has(buildingId)) {
+      try {
+        const city = useCityStore()
+        const single = useSinglePlayerStore()
+        const ownerForTech = owner || (single.isActive ? single.humanPlayer()?.id || 'p0' : null)
+        const hasUni = city.flatGrid.some(c => c.isOrigin && (c.buildingId==='school'||c.buildingId==='university') && (!ownerForTech || c.owner===ownerForTech))
+        if (!hasUni) return null
+      } catch {}
+    }
     const w = b?.width || 1, h = b?.height || 1
     const dur = durationFor(buildingId)
     if (!dur || isNaN(dur) || dur === 0) return null // instant, no cola

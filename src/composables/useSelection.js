@@ -185,27 +185,63 @@ export function useSelection() {
         continue
       }
       if (dist <= 0) { e.target = null; e.isRunning = false; e.speed = e.baseSpeed || 1150; continue }
-      // moverse un paso hacia target
+      // moverse un paso hacia target — A* BFS por carreteras/rieles (evita atascarse en muros)
       const isTrain = e.type === 'train'
-      // usa stepTowards si es tráfico, sino random pero dirigido
-      // importa stepTowards lógica simple
-      const dx = Math.sign(tx - e.x), dy = Math.sign(ty - e.y)
-      let moved = false
-      const tryMove = (ddx, ddy) => {
-        const nx = e.x + ddx, ny = e.y + ddy
-        const cell = city.getCell(nx, ny)
-        const isRoad = cell && (cell.hasRoad || ['road','dirt_road','concrete_road','cobble_road'].includes(cell.buildingId))
-        const isRail = cell && (cell.hasRail || cell.buildingId === 'rail')
-        const ok = isTrain ? isRail : isRoad
-        if (ok) { e.x = nx; e.y = ny; e.dir = ddx===1?'right':ddx===-1?'left':ddy===-1?'up':'down'; moved=true; return true }
-        return false
+      const isRoadCell = (x,y) => {
+        const c = city.getCell(x,y)
+        if (!c) return false
+        if (isTrain) return !!(c.hasRail || c.buildingId === 'rail')
+        return !!(c.hasRoad || ['road','dirt_road','concrete_road','cobble_road'].includes(c.buildingId))
       }
-      if (dx!==0 && tryMove(dx,0)) {}
-      else if (dy!==0 && tryMove(0,dy)) {}
-      else {
-        // intenta cualquiera
+      // BFS A* limitado a 60 pasos y 300 nodos para no congelar en low
+      const findNextStep = (sx,sy,tx,ty) => {
+        if (sx===tx && sy===ty) return null
+        const q = [{ x:sx, y:sy, path:[] }]
+        const visited = new Set([`${sx},${sy}`])
         const dirs = [[1,0],[-1,0],[0,1],[0,-1]]
-        for (const [ddx,ddy] of dirs) if (tryMove(ddx,ddy)) break
+        let iters = 0
+        while (q.length && iters++ < 320) {
+          // A* — ordena por Manhattan (h)
+          q.sort((a,b)=> (Math.abs(a.x-tx)+Math.abs(a.y-ty)) - (Math.abs(b.x-tx)+Math.abs(b.y-ty)))
+          const cur = q.shift()
+          for (const [dx,dy] of dirs) {
+            const nx = cur.x+dx, ny = cur.y+dy
+            const key = `${nx},${ny}`
+            if (visited.has(key)) continue
+            const isTarget = nx===tx && ny===ty
+            // permite pisar target aunque no sea carretera (ataque a edificio)
+            if (!isTarget && !isRoadCell(nx,ny)) continue
+            visited.add(key)
+            const newPath = cur.path.length===0 ? [{x:nx,y:ny}] : [...cur.path, {x:nx,y:ny}]
+            if (newPath.length > 60) continue
+            if (isTarget) return newPath[0]
+            q.push({ x:nx, y:ny, path:newPath })
+            if (q.length > 220) q.length = 220
+          }
+        }
+        return null
+      }
+      const step = findNextStep(e.x, e.y, tx, ty)
+      let moved = false
+      if (step) {
+        const ddx = step.x - e.x, ddy = step.y - e.y
+        e.x = step.x; e.y = step.y
+        e.dir = ddx===1?'right':ddx===-1?'left':ddy===-1?'up':'down'
+        moved = true
+      } else {
+        // fallback greedy si no hay ruta (cerca)
+        const dx = Math.sign(tx - e.x), dy = Math.sign(ty - e.y)
+        const tryMove = (ddx, ddy) => {
+          const nx = e.x + ddx, ny = e.y + ddy
+          if (isRoadCell(nx,ny) || (nx===tx && ny===ty)) { e.x=nx; e.y=ny; e.dir=ddx===1?'right':ddx===-1?'left':ddy===-1?'up':'down'; moved=true; return true }
+          return false
+        }
+        if (dx!==0 && tryMove(dx,0)) {}
+        else if (dy!==0 && tryMove(0,dy)) {}
+        else {
+          const dirs = [[1,0],[-1,0],[0,1],[0,-1]]
+          for (const [ddx,ddy] of dirs) if (tryMove(ddx,ddy)) break
+        }
       }
       if (!moved) { e.target = null; e.isRunning=false }
     }

@@ -568,11 +568,11 @@ onMounted(async () => {
   window.addEventListener('pagehide', flushAll)
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushAll() })
 
+  // Música no suena sola al entrar al juego — solo con N (web) o ESC/Pausa → Audio
   const tryAutoPlay = () => {
     try {
       audioMgr.init()
       const tk = audioMgr.music.currentTrack
-      // en móvil también debe sonar fondo + melodía igual que web - no hacer return vacío
       if (!tk || tk === 'calma') {
         audioMgr.music.play('calma')
       } else {
@@ -580,14 +580,7 @@ onMounted(async () => {
       }
     } catch {}
   }
-  setTimeout(tryAutoPlay, 600)
-  const onFirstGesture = () => {
-    tryAutoPlay()
-    window.removeEventListener('click', onFirstGesture)
-    window.removeEventListener('keydown', onFirstGesture)
-  }
-  window.addEventListener('click', onFirstGesture, { once: true })
-  window.addEventListener('keydown', onFirstGesture, { once: true })
+  // No auto-play en menú/juego — queda en silencio hasta gesto explícito N / 🔊
 })
 
 onUnmounted(() => {

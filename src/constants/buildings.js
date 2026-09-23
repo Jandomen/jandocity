@@ -272,12 +272,12 @@ export const BUILDING_TYPES = {
     id: 'airport',
     label: 'Aeropuerto',
     icon: '✈️',
-    width: 4, height: 3,
-    cost: 800,
-    effects: { population: 0, energy: -12, water: -5, oxygen: -18 },
-    incomePerTick: 45,
+    width: 6, height: 6,
+    cost: 1800,
+    effects: { population: 0, energy: -16, water: -8, oxygen: -24 },
+    incomePerTick: 78,
     color: 'bg-sky-700',
-    description: '+45💰 · -18 O₂ • 4×3'
+    description: '+78💰 · -24 O₂ • 6×6'
   },
   stadium: {
     id: 'stadium',
@@ -383,12 +383,12 @@ export const BUILDING_TYPES = {
     id: 'intl_airport',
     label: 'Aeropuerto intl.',
     icon: '✈️',
-    width: 5, height: 3,
-    cost: 1600,
-    effects: { population: 0, energy: -18, water: -8, oxygen: -22 },
-    incomePerTick: 62,
+    width: 6, height: 12,
+    cost: 3200,
+    effects: { population: 0, energy: -28, water: -14, oxygen: -36 },
+    incomePerTick: 135,
     color: 'bg-sky-800',
-    description: '5×3 · +62💰'
+    description: '6×12 · +135💰 • pista larga'
   },
   // === Servicios — Hoteles / Restaurantes / Universidad ===
   hotel: {
@@ -1216,7 +1216,22 @@ export const BUILDING_TYPES = {
     incomePerTick: 0,
     color: 'bg-slate-600',
     description: '2×1 • lleva 6 unidades'
-  }
+  },
+  // === NUEVOS — Tech / Salud / Ocio / Verde / Defensa / Transporte (impuestos) ===
+  lab: { id: 'lab', label: 'Laboratorio', icon: '🧪', width: 2, height: 2, cost: 520, effects: { population: 0, energy: -6, water: -3, oxygen: -2 }, incomePerTick: 18, color: 'bg-violet-700', description: '2×2 · +18💰 tech' },
+  observatory: { id: 'observatory', label: 'Observatorio', icon: '🔭', width: 2, height: 2, cost: 480, effects: { population: 0, energy: -5, water: -2, oxygen: 0 }, incomePerTick: 14, color: 'bg-indigo-800', description: '2×2 · +14💰 ciencia' },
+  ai_center: { id: 'ai_center', label: 'Centro IA', icon: '🤖', width: 3, height: 3, cost: 900, effects: { population: 0, energy: -12, water: -4, oxygen: -4 }, incomePerTick: 28, color: 'bg-slate-800', description: '3×3 · +28💰 -12⚡' },
+  clinic: { id: 'clinic', label: 'Clínica', icon: '🩺', width: 1, height: 1, cost: 140, effects: { population: 0, energy: -2, water: -2, oxygen: 0 }, incomePerTick: 9, color: 'bg-emerald-600', description: '1×1 · +9💰' },
+  medical_uni: { id: 'medical_uni', label: 'Uni Médica', icon: '⚕️', width: 3, height: 3, cost: 850, effects: { population: 12, energy: -10, water: -6, oxygen: -6 }, incomePerTick: 16, color: 'bg-teal-800', description: '3×3 · +12 hab +16💰' },
+  cinema: { id: 'cinema', label: 'Cine', icon: '🎬', width: 2, height: 1, cost: 260, effects: { population: 0, energy: -4, water: -2, oxygen: -3 }, incomePerTick: 17, color: 'bg-rose-700', description: '2×1 · +17💰' },
+  theme_park: { id: 'theme_park', label: 'Parque temático', icon: '🎢', width: 4, height: 4, cost: 1400, effects: { population: 6, energy: -12, water: -8, oxygen: -6 }, incomePerTick: 42, color: 'bg-amber-600', description: '4×4 · +42💰' },
+  zoo: { id: 'zoo', label: 'Zoológico', icon: '🦁', width: 3, height: 3, cost: 750, effects: { population: 0, energy: -6, water: -5, oxygen: 4 }, incomePerTick: 20, color: 'bg-lime-700', description: '3×3 · +20💰 +4 O₂' },
+  nursery: { id: 'nursery', label: 'Vivero', icon: '🌱', width: 2, height: 2, cost: 220, effects: { population: 0, energy: -2, water: -3, oxygen: 8 }, incomePerTick: 7, color: 'bg-green-700', description: '2×2 · +8 O₂ +7💰' },
+  wetland: { id: 'wetland', label: 'Humedal', icon: '🦆', width: 3, height: 2, cost: 320, effects: { population: 0, energy: -2, water: 6, oxygen: 12 }, incomePerTick: 6, color: 'bg-cyan-700', description: '3×2 · +12 O₂ +6💧 +6💰' },
+  bunker: { id: 'bunker', label: 'Búnker', icon: '🛡️', width: 2, height: 2, cost: 420, effects: { population: 0, energy: -4, water: -2, oxygen: -2 }, incomePerTick: -4, color: 'bg-zinc-800', description: '2×2 · -4💰 defensa' },
+  radar_tower: { id: 'radar_tower', label: 'Torre radar', icon: '📡', width: 1, height: 1, cost: 260, effects: { population: 0, energy: -5, water: 0, oxygen: 0 }, incomePerTick: 9, color: 'bg-slate-700', description: '1×1 · +9💰 radar' },
+  heliport: { id: 'heliport', label: 'Helipuerto', icon: '🚁', width: 2, height: 2, cost: 380, effects: { population: 0, energy: -6, water: -2, oxygen: -4 }, incomePerTick: 18, color: 'bg-sky-800', description: '2×2 · +18💰' },
+  metro_entry: { id: 'metro_entry', label: 'Metro', icon: '🚇', width: 1, height: 1, cost: 200, effects: { population: 0, energy: -4, water: -1, oxygen: 0 }, incomePerTick: 12, color: 'bg-zinc-900', description: '1×1 · +12💰' }
 }
 
 export const TOOL_TYPES = {

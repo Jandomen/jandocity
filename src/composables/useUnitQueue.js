@@ -43,6 +43,16 @@ function findRoadNear(city, ox, oy, w, h) {
 export function useUnitQueue() {
   function enqueue(buildingId, unitType, owner = 'p0') {
     const city = useCityStore()
+    // Árbol: rocket/missile/atomic requieren arsenal + universidad/escuela
+    const HEAVY_UNIT = new Set(['rocket','missile','atomic','atomic_heavy'])
+    if (HEAVY_UNIT.has(unitType)) {
+      try {
+        const hasArs = city.flatGrid.some(c => c.isOrigin && c.buildingId==='arsenal' && (!owner || c.owner===owner))
+        const hasUni = city.flatGrid.some(c => c.isOrigin && (c.buildingId==='university'||c.buildingId==='school') && (!owner || c.owner===owner))
+        if (!hasArs || !hasUni) return null
+        if (unitType==='atomic_heavy' && !city.flatGrid.some(c=>c.isOrigin&&c.buildingId==='university'&& (!owner||c.owner===owner))) return null
+      } catch {}
+    }
     // busca edificio más cercano del tipo que pertenezca al owner (si single, filtra por owner)
     const origins = city.flatGrid.filter(c => c.isOrigin && c.buildingId === buildingId && (!owner || c.owner === owner || !c.owner))
     // si no hay, busca cualquiera del tipo (para libre)
