@@ -207,7 +207,7 @@ watch(() => [camera.x.value, camera.y.value, player.x, player.y], draw)
 
 <template>
   <div v-if="show" class="fixed inset-0 z-[60] bg-black/70 backdrop-blur-md flex flex-col items-center justify-center p-4">
-    <div class="bg-slate-900 rounded-2xl border border-white/15 w-full max-w-[560px] max-h-[82vh] flex flex-col overflow-hidden shadow-[0_16px_48px_rgba(0,0,0,0.7)]">
+    <div class="bg-slate-900 rounded-2xl border border-white/15 w-full max-w-[340px] md:max-w-[560px] max-h-[82vh] flex flex-col overflow-hidden shadow-[0_16px_48px_rgba(0,0,0,0.7)]">
       <div class="shrink-0 px-4 py-2 border-b border-white/10 flex items-center justify-between" :class="isTargeting ? 'bg-red-900/60' : 'bg-slate-800/60'">
         <span class="text-xs font-black tracking-widest flex items-center gap-2">
           <span v-if="isTargeting">🎯 MODO ATAQUE REMOTO</span>

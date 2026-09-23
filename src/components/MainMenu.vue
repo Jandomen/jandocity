@@ -29,7 +29,7 @@ const isWeb = (() => !isNative && !isElectron)()
     <div class="absolute inset-0 opacity-40" style="background-image: linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px); background-size: 28px 28px;"></div>
     <div class="absolute inset-0" style="background: radial-gradient(ellipse at 50% 0%, rgba(56,189,248,0.18), transparent 60%), radial-gradient(ellipse at 50% 100%, rgba(16,185,129,0.12), transparent 50%);"></div>
 
-    <div class="relative w-full max-w-[420px] flex flex-col items-center gap-5 mx-auto my-4 md:my-auto flex-1 justify-center">
+    <div class="relative w-full max-w-[340px] md:max-w-[420px] flex flex-col items-center gap-5 mx-auto my-4 md:my-auto flex-1 justify-center">
       <!-- Placa título estilo juego -->
       <div class="w-full bg-[#1e293b] border-[3px] border-[#334155] rounded-xl shadow-[0_8px_0_#0f172a,0_12px_24px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.15)] p-4 flex flex-col items-center gap-2">
         <div class="w-16 h-16 rounded-xl bg-gradient-to-b from-[#fde68a] to-[#92400e] border-2 border-white/20 shadow flex items-center justify-center text-2xl">🏙️</div>

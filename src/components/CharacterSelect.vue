@@ -24,7 +24,7 @@ function confirm() {
 
 <template>
   <div v-if="show" class="fixed inset-0 z-[70] bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
-    <div class="bg-[#1e293b] border-[3px] border-[#334155] rounded-2xl w-full max-w-[560px] max-h-[86vh] flex flex-col overflow-hidden shadow-[0_8px_0_#0f172a,0_16px_32px_rgba(0,0,0,0.6)]">
+    <div class="bg-[#1e293b] border-[3px] border-[#334155] rounded-2xl w-full max-w-[340px] md:max-w-[560px] max-h-[86vh] flex flex-col overflow-hidden shadow-[0_8px_0_#0f172a,0_16px_32px_rgba(0,0,0,0.6)]">
       <div class="shrink-0 px-4 py-3 border-b-[3px] border-[#334155] bg-[#0f172a] flex items-center justify-between">
         <h2 class="font-black tracking-widest text-sm" style="font-family:'Cinzel',serif; color:#fde68a;">ELIGE PROTAGONISTA — 10 disponibles</h2>
         <span class="text-[11px] text-white/50 font-mono bg-black/30 px-2 py-1 rounded-full border border-white/10">{{ selected }}</span>

@@ -40,7 +40,7 @@ function retry() {
 <template>
   <Transition name="fade">
     <div v-if="show" class="fixed inset-0 z-[90] bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
-      <div class="bg-[#1e293b] border-[3px] border-[#334155] rounded-2xl w-full max-w-[420px] overflow-hidden shadow-[0_8px_0_#0f172a,0_16px_32px_rgba(0,0,0,0.6)]">
+      <div class="bg-[#1e293b] border-[3px] border-[#334155] rounded-2xl w-full max-w-[340px] md:max-w-[420px] overflow-hidden shadow-[0_8px_0_#0f172a,0_16px_32px_rgba(0,0,0,0.6)]">
         <div class="px-4 py-3 border-b-[3px] border-[#334155] flex items-center gap-3 bg-[#0f172a]">
           <span class="w-9 h-9 rounded-xl bg-emerald-600 border-2 border-emerald-400 flex items-center justify-center text-lg">⬇️</span>
           <div class="flex-1">

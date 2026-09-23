@@ -32,7 +32,7 @@ function formatDate(ts) {
 <template>
   <div class="absolute inset-0 z-30 flex flex-col bg-[#0a0f1e] text-white overflow-auto">
     <div class="absolute inset-0" style="background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 28px 28px;"></div>
-    <div class="relative flex-1 flex flex-col max-w-[560px] w-full mx-auto p-4 gap-4 min-h-[100dvh]">
+    <div class="relative flex-1 flex flex-col max-w-[340px] md:max-w-[560px] w-full mx-auto p-4 gap-4 min-h-[100dvh]">
       <div class="bg-[#1e293b] border-[3px] border-[#334155] rounded-xl shadow-[0_6px_0_#0f172a] p-3 flex items-center justify-between">
         <button @click="emit('back')" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10 text-xs font-black">‹ Volver</button>
         <h2 class="font-black tracking-widest text-sm" style="font-family:'Cinzel',serif; color:#fde68a; text-shadow: 0 1px 0 #92400e;">TUS MUNDOS</h2>
