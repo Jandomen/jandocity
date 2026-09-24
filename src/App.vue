@@ -60,6 +60,7 @@ const isNative = computed(() => {
   return false
 })
 const isDesktop = computed(() => isElectron.value || isNative.value)
+const isWeb = computed(() => !isNative.value && !isElectron.value)
 const containerStyle = computed(() => {
   // IMMERSIVE: WebView ocupa toda la ventana (edge-to-edge, barras ocultas).
   // No poner padding en el contenedor: el mapa va fullscreen.
@@ -251,6 +252,11 @@ function onKeydown(e) {
 }
 
 function handleMenuSelect(mode) {
+  // En web jandocity.vercel.app solo descarga — no jugar en navegador
+  if (isWeb.value && mode !== 'downloads') {
+    appState.value = 'downloads'
+    return
+  }
   if (mode === 'free') {
     single.isActive = false
     buildQueue.clear()
