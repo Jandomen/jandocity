@@ -38,8 +38,8 @@ const isWeb = (() => !isNative && !isElectron)()
         <p class="text-[10px] tracking-[0.32em] text-[#94a3b8] font-black">ELIGE UN MODO</p>
       </div>
 
-      <!-- Botones estilo madera/metal juego -->
-      <div class="w-full flex flex-col gap-3">
+      <!-- Botones estilo madera/metal juego — en web jandocity.vercel.app solo descarga -->
+      <div v-if="!isWeb" class="w-full flex flex-col gap-3">
         <button @click="emit('select','free')" class="group w-full flex items-center gap-3 bg-[#14532d] hover:bg-[#15803d] active:translate-y-[2px] text-white rounded-xl px-4 py-3.5 shadow-[0_6px_0_#052e16,0_8px_16px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.15)] border-2 border-[#16a34a] transition-all">
           <span class="w-11 h-11 rounded-lg bg-black/20 border-2 border-white/20 flex items-center justify-center text-xl shadow-inner">🌍</span>
           <div class="text-left flex-1">
@@ -66,6 +66,10 @@ const isWeb = (() => !isNative && !isElectron)()
           </div>
           <span class="w-7 h-7 rounded-full bg-white text-[#581c87] flex items-center justify-center font-black text-sm">›</span>
         </button>
+      </div>
+      <div v-else class="w-full bg-amber-900/30 border-2 border-amber-400/50 rounded-xl p-3 text-center">
+        <div class="text-xs font-black text-amber-300">🌐 Web solo para descargar</div>
+        <div class="text-[11px] text-white/70 mt-1">El juego se juega descargando APK / Windows / Linux abajo — no en navegador.</div>
       </div>
 
       <!-- Descargas — página aparte con logos oficiales + contador -->
