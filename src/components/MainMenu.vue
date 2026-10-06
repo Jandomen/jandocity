@@ -67,10 +67,7 @@ const isWeb = (() => !isNative && !isElectron)()
           <span class="w-7 h-7 rounded-full bg-white text-[#581c87] flex items-center justify-center font-black text-sm">›</span>
         </button>
       </div>
-      <div v-else class="w-full bg-amber-900/30 border-2 border-amber-400/50 rounded-xl p-3 text-center">
-        <div class="text-xs font-black text-amber-300">🌐 Web solo para descargar</div>
-        <div class="text-[11px] text-white/70 mt-1">El juego se juega descargando APK / Windows / Linux abajo — no en navegador.</div>
-      </div>
+
 
       <!-- Descargas — página aparte con logos oficiales + contador -->
       <button v-if="isWeb" @click="emit('select','downloads')" class="group w-full flex items-center gap-3 bg-[#0f172a] hover:bg-[#1e293b] active:translate-y-[2px] text-white rounded-xl px-4 py-3.5 shadow-[0_6px_0_#020617,0_8px_16px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.08)] border-2 border-[#334155] transition-all">
@@ -88,7 +85,7 @@ const isWeb = (() => !isNative && !isElectron)()
         <span class="w-7 h-7 rounded-full bg-white text-slate-900 flex items-center justify-center font-black text-sm group-active:scale-95">›</span>
       </button>
 
-      <button @click="exitApp" class="w-full mt-2 flex items-center justify-center gap-2 bg-black/40 hover:bg-black/60 text-white/70 hover:text-white rounded-xl px-4 py-3 border border-white/10 text-xs font-bold tracking-widest">⏻ SALIR DEL JUEGO</button>
+      <button v-if="!isWeb" @click="exitApp" class="w-full mt-2 flex items-center justify-center gap-2 bg-black/40 hover:bg-black/60 text-white/70 hover:text-white rounded-xl px-4 py-3 border border-white/10 text-xs font-bold tracking-widest">⏻ SALIR DEL JUEGO</button>
 
       <div class="flex items-center gap-1.5 text-[10px] text-white/40 font-mono pt-2 pb-1">
         <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
