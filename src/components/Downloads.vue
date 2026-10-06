@@ -57,7 +57,7 @@ async function handleDownload(platform, href) {
           </div>
           <div class="flex-1">
             <div class="font-black text-white text-sm tracking-wide flex items-center gap-2">ANDROID <span class="text-[10px] bg-white text-[#14532d] px-2 py-0.5 rounded-full">{{ counts.android.toLocaleString() }} descargas</span></div>
-            <div class="text-[11px] text-white/70 leading-none mt-1">APK directa • sin Play Store • offline</div>
+            <div class="text-[11px] text-white/70 leading-none mt-1">APK directa • offline</div>
           </div>
         </div>
         <button @click="handleDownload('android','/Jandocity.apk')" class="w-full flex items-center gap-3 bg-white hover:bg-white/90 text-[#14532d] rounded-xl px-4 py-3 font-black text-sm shadow-[0_4px_0_#052e16] active:translate-y-[1px] transition-all">
@@ -78,7 +78,7 @@ async function handleDownload(platform, href) {
           </div>
           <div class="flex-1">
             <div class="font-black text-white text-sm tracking-wide flex items-center gap-2 flex-wrap">WINDOWS <span class="text-[10px] bg-white text-[#1e3a8a] px-2 py-0.5 rounded-full">{{ (Number(counts.windows_portable)+Number(counts.windows_installer)).toLocaleString() }} descargas</span></div>
-            <div class="text-[11px] text-white/70 leading-none mt-1">Portable o instalador • offline • auto-update</div>
+            <div class="text-[11px] text-white/70 leading-none mt-1">Portable o instalador • offline</div>
           </div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -108,7 +108,7 @@ async function handleDownload(platform, href) {
           </div>
           <div class="flex-1">
             <div class="font-black text-white text-sm tracking-wide flex items-center gap-2 flex-wrap">LINUX <span class="text-[10px] bg-white text-[#7c2d12] px-2 py-0.5 rounded-full">{{ (Number(counts.linux_deb)+Number(counts.linux_appimage)).toLocaleString() }} descargas</span></div>
-            <div class="text-[11px] text-white/70 leading-none mt-1">Instalador • portable</div>
+            <div class="text-[11px] text-white/70 leading-none mt-1">Portable o instalador • offline</div>
           </div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -125,7 +125,7 @@ async function handleDownload(platform, href) {
           <span>DEB: {{ counts.linux_deb.toLocaleString() }}</span>
           <span>AppImage: {{ counts.linux_appimage.toLocaleString() }}</span>
         </div>
-        <p class="text-[10px] text-white/30 font-mono text-center">AppImage por límite GitHub 100MB → en Releases</p>
+        <p class="text-[10px] text-white/30 font-mono text-center">AppImage disponible en Releases</p>
       </div>
 
       <div class="text-[10px] text-white/10 font-mono text-center py-2 opacity-0 select-none">—</div>
